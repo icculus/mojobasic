@@ -1,0 +1,319 @@
+/**
+ * MojoBASIC; a modern reimplementation of QuickBASIC.
+ *
+ * Please see the file LICENSE.txt in the source's root directory.
+ *
+ *  This file written by Ryan C. Gordon.
+ */
+
+// This is a Lemon Parser grammar for MojoBASIC.
+
+// Lemon is here: http://www.hwaci.com/sw/lemon/  ...  the source is included
+//  with MojoBASIC, and built with the library, so you don't have to track
+//  down the dependency.
+
+%name ParseMojoBASIC
+
+%start_symbol program
+%token_prefix TOKEN_MOJOBASIC_
+%token_type { TokenData }
+%extra_argument { Compiler *ctx }
+
+%include {
+#ifndef __MOJOBASIC_COMPILER__
+#error Do not compile this file directly.
+#endif
+}
+
+%syntax_error {
+    // !!! FIXME: make this a proper fail() function.
+    ctx->fail("Syntax error");
+}
+
+%parse_failure {
+    // !!! FIXME: make this a proper fail() function.
+    ctx->fail("Giving up. Parser is hopelessly lost...");
+}
+
+%stack_overflow {
+    // !!! FIXME: make this a proper fail() function.
+    ctx->fail("Giving up. Parser stack overflow");
+}
+
+// operator precedence (matches C spec for now)...
+
+%left OR.
+%left XOR.
+%left AND.
+%left ASSIGN NEQ.
+%left LT LEQ GT GEQ.
+%left PLUS MINUS.
+%left STAR SLASH BACKSLASH MOD.
+%right NOT.
+%left DOT LPAREN RPAREN.
+
+
+// we don't need to mess with the precedence of ELSE because this isn't C.  :)
+
+// The rules...
+eol ::= NEWLINE.
+eol ::= COLON.
+
+%type vardecl { AstVarDeclaration * }
+%destructor vardecl { delete $$; }
+vardecl(A) ::= IDENTIFIER(B) AS DATATYPE(C). { A = new AstVarDeclaration(ctx, B, NULL, C, NULL); }
+vardecl(A) ::= IDENTIFIER(B) AS DATATYPE(C) STAR INT_CONSTANT(D). { A = new AstVarDeclaration(ctx, B, NULL, C, &D.i64); }
+vardecl(A) ::= IDENTIFIER(B) LPAREN expression(C) RPAREN AS DATATYPE(D). { A = new AstVarDeclaration(ctx, B, C, D, NULL); }
+vardecl(A) ::= IDENTIFIER(B) LPAREN expression(C) RPAREN AS DATATYPE(D) STAR INT_CONSTANT(E). { A = new AstVarDeclaration(ctx, B, C, D, &E.i64); }
+
+%type varlist { AstVarDeclaration * }
+%destructor varlist { delete $$; }
+varlist(A) ::= vardecl(B). { A = B; }
+varlist(A) ::= varlist(B) COMMA vardecl(C). { A = B; assert(A->tail != NULL); A->tail->next = C; A->tail = C; }
+
+%type varblock { AstVarDeclaration * }
+%destructor varblock { delete $$; }
+varblock(A) ::= vardecl(B) eol. { A = B; }
+varblock(A) ::= varblock(B) varblock(C). { A = B; assert(A->tail != NULL); A->tail->next = C; A->tail = C; }
+
+%type program { AstProgram * }
+%destructor program { (void) ctx; delete $$; }  // the "(void) ctx" silences a compiler warning.
+program ::= statement_block(C). { assert(ctx->ast == NULL); ctx->ast = new AstProgram(ctx, B.string, C); }
+
+%type statement_block { AstStatementBlock * }
+%destructor statement_block { delete $$; }
+statement_block(A) ::= statement(B). { A = B ? new AstStatementBlock(ctx, B) : NULL; }
+statement_block(A) ::= statement_block(B) statement(C). { A = B; if (C) { assert(A->tail != NULL); A->tail->next = C; A->tail = C; } }
+
+%type statement { AstStatement * }
+%destructor statement { delete $$; }
+statement(A) ::= metacommand(B). { A = B; }
+statement(A) ::= function_declaration(B). { A = B; }
+statement(A) ::= procedure_declaration(B). { A = B; }
+statement(A) ::= const_declaration(B). { A = B; }
+statement(A) ::= type_declaration(B). { A = B; }
+statement(A) ::= deftype(B). { A = B; }
+statement(A) ::= function_definition(B). { A = B; }
+statement(A) ::= procedure_definition(B). { A = B; }
+statement(A) ::= procedure_call(B). { A = B; }
+statement(A) ::= on_error(B). { A = B; }
+statement(A) ::= assignment_statement(B). { A = B; }
+statement(A) ::= dim_statement(B). { A = B; }
+statement(A) ::= open_statement(B). { A = B; }
+statement(A) ::= if_statement(B). { A = B; }
+statement(A) ::= for_statement(B). { A = B; }
+statement(A) ::= do_statement(B). { A = B; }
+statement(A) ::= select_statement(B). { A = B; }
+statement(A) ::= print_statement(B). { A = B; }
+statement(A) ::= line_input_statement(B). { A = B; }
+statement(A) ::= view_print_statement(B). { A = B; }
+statement(A) ::= exit_statement(B). { A = B; }
+statement(A) ::= label(B). { A = B; }
+statement(A) ::= NEWLINE. { A = NULL; }
+//statement(A) ::= error SEMICOLON. { A = NULL; }  // !!! FIXME: research using the error nonterminal
+
+%type label { AstLabel * }
+%destructor label { delete $$; }
+label(A) ::= IDENTIFIER(B) COLON. { A = new AstLabel(ctx, B.string); }
+
+%type metacommand { AstMetacommand * }
+%destructor metacommand { delete $$; }
+metacommand(A) ::= DOLLAR DYNAMIC. { A = new AstMetacommand(ctx, 1); }
+metacommand(A) ::= DOLLAR STATIC. { A = new AstMetacommand(ctx, 2); }
+
+%type function_declaration { AstFunction * }
+%destructor function_declaration { delete $$; }
+function_declaration(A) ::= DECLARE FUNCTION IDENTIFIER(B) LPAREN varlist(C) RPAREN AS IDENTIFIER(D) eol. { A = new AstFunction(ctx, D.string, B.string, C, NULL); }
+
+%type procedure_declaration { AstFunction * }
+%destructor procedure_declaration { delete $$; }
+procedure_declaration(A) ::= DECLARE SUB IDENTIFIER(B) LPAREN varlist(C) RPAREN eol. { A = new AstFunction(ctx, NULL, B.string, C, NULL); }
+
+%type const_declaration { AstConstDeclaration * }
+%destructor const_declaration { delete $$; }
+const_declaration(A) ::= CONST IDENTIFIER(B) ASSIGN expression(C) eol. { A = new AstConstDeclaration(ctx, B.string, C); }
+
+%type type_declaration { AstTypeDeclaration * }
+%destructor type_declaration { delete $$; }
+type_declaration(A) ::= TYPE IDENTIFIER(B) eol varblock(C) END TYPE eol. { A = new AstTypeDeclaration(ctx, B.string, C); }
+
+%type dim_statement { AstDimStatement * }
+%destructor dim_statement { delete $$; }
+dim_statement(A) ::= dimcmd(B) vardecl(C) eol. { A = new AstDimDeclaration(ctx, B, 0, C); }
+dim_statement(A) ::= dimcmd(B) SHARED vardecl(C) eol. { A = new AstDimDeclaration(ctx, B, 1, C); }
+
+%type dimcmd { int }
+dimcmd(A) ::= DIM. { A = 0; }
+dimcmd(A) ::= REDIM. { A = 1; }
+
+%type deftype { AstDefType * }
+deftype(A) ::= DEFINT IDENTIFIER(B) MINUS IDENTIFIER(C). { A = new AstDefType(ctx, 1, B.string, C.string); }
+deftype(A) ::= DEFSNG IDENTIFIER(B) MINUS IDENTIFIER(C). { A = new AstDefType(ctx, 2, B.string, C.string); }
+// !!! FIXME: more
+
+%type function_definition { AstFunction * }
+%destructor function_definition { delete $$; }
+function_definition(A) ::= FUNCTION IDENTIFIER(B) LPAREN varlist(C) RPAREN AS IDENTIFIER(D) eol statement_block(E) END FUNCTION eol. { A = new AstFunction(ctx, D.string, B.string, C, E); }
+
+%type procedure_definition { AstFunction * }
+%destructor procedure_definition { delete $$; }
+procedure_definition(A) ::= SUB IDENTIFIER(B) LPAREN varlist(C) RPAREN eol statement_block(D) END SUB eol. { A = new AstFunction(ctx, NULL, B.string, C, D); }
+
+%type procedure_call { AstProcedureCall * }
+%destructor procedure_call { delete $$; }
+procedure_call(A) ::= IDENTIFIER(B) expression_list(C) eol. { A = new AstProcedureCall(ctx, B.string, C); }
+
+%type on_error { AstOnError * }
+%destructor on_error { delete $$; }
+on_error(A) ::= ON ERROR RESUME NEXT eol. { A = new AstOnError(ctx, 0, NULL, NULL); }
+on_error(A) ::= ON ERROR GOTO IDENTIFIER(B) eol. { A = new AstOnError(ctx, 0, B.string, NULL); }
+on_error(A) ::= ON ERROR GOTO INT_CONSTANT(B) eol. { A = new AstOnError(ctx, 0, NULL, &B.i64); }
+on_error(A) ::= ON LOCAL ERROR RESUME NEXT eol. { A = new AstOnError(ctx, 1, NULL, NULL); }
+on_error(A) ::= ON LOCAL ERROR GOTO IDENTIFIER(B) eol. { A = new AstOnError(ctx, 1, B.string, NULL); }
+on_error(A) ::= ON LOCAL ERROR GOTO INT_CONSTANT(B) eol. { A = new AstOnError(ctx, 1, NULL, &B.i64); }
+
+%type assignment_statement { AstStatement * }
+%destructor assignment_statement { delete $$; }
+assignment_statement(A) ::= lvalue(B) ASSIGN expression(C) eol. { A = new AstAssignmentStatement(ctx, B, C); }
+
+%type lvalue { AstExpression * }
+%destructor lvalue { delete $$; }
+lvalue(A) ::= IDENTIFIER(B).
+lvalue(A) ::= struct_deref(B).
+
+%type struct_deref { AstExpression * }
+%destructor struct_deref { delete $$; }
+struct_deref(A) ::= IDENTIFIER(B) DOT IDENTIFIER(C).
+struct_deref(A) ::= struct_deref(B) DOT IDENTIFIER(C). { A = new AstStructDereferenceExpression(ctx, B, C.string); }
+
+open_statement(A) ::= OPEN expression(B) open_mode(C) open_access(D) open_locking(E) AS expression(F) LEN ASSIGN expression(G) eol. { A = new AstOpenStatement(ctx, B, C, D, E, F, G); }
+open_statement(A) ::= OPEN expression(B) open_mode(C) open_access(D) open_locking(E) AS expression(F) eol. { A = new AstOpenStatement(ctx, B, C, D, E, F, NULL); }
+
+%type open_mode { const char * }
+open_mode(A) ::= FOR INPUT. { A = "I"; }
+open_mode(A) ::= FOR OUTPUT. { A = "O"; }
+open_mode(A) ::= FOR APPEND. { A = "A"; }
+open_mode(A) ::= FOR BINARY. { A = "B"; }
+open_mode(A) ::= FOR RANDOM. { A = "R"; }
+open_mode(A) ::= . { A = NULL; }
+
+%type open_access { const char * }
+open_access(A) ::= ACCESS READ. { A = "R"; }
+open_access(A) ::= ACCESS WRITE. { A = "W"; }
+open_access(A) ::= ACCESS READ WRITE. { A = "+"; }
+open_access(A) ::= . { A = NULL; }
+
+%type open_locking { const char * }
+open_locking(A) ::= SHARED. { A = "S"; }
+open_locking(A) ::= LOCK READ. { A = "R"; }
+open_locking(A) ::= LOCK WRITE. { A = "W"; }
+open_locking(A) ::= LOCK READ WRITE. { A = "+"; }
+open_locking(A) ::= . { A = NULL; }
+
+// CLOSE is a procedure in the standard library, that accepts varargs. OPEN is too, it just needs syntactic sugar in the parser.
+
+// !!! FIXME: a metacommand isn't a legal statement in the one-line versions, but here it would pass. Semantic analysis should catch?
+%type if_statement { AstIfStatement * }
+%destructor elseifs { delete $$; }
+if_statement(A) ::= IF expression(B) THEN statement(C) eol. { A = new AstIfStatement(ctx, B, C, NULL, NULL); }
+if_statement(A) ::= IF expression(B) THEN statement(C) ELSE statement(D) eol. { A = new AstIfStatement(ctx, B, C, NULL, D); }
+if_statement(A) ::= IF expression(B) THEN eol statement_block(C) END IF eol. { A = new AstIfStatement(ctx, B, C, NULL, NULL); }
+if_statement(A) ::= IF expression(B) THEN eol statement_block(C) elseifs(D) END IF eol. { A = new AstIfStatement(ctx, B, C, D, NULL); }
+if_statement(A) ::= IF expression(B) THEN eol statement_block(C) ELSE statement_block(D) END IF eol. { A = new AstIfStatement(ctx, B, C, NULL, D); }
+if_statement(A) ::= IF expression(B) THEN eol statement_block(C) elseifs(D) ELSE statement_block(E) END IF eol. { A = new AstIfStatement(ctx, B, C, D, E); }
+
+%type elseifs { AstElseIfStatement * }
+%destructor elseifs { delete $$; }
+elseifs(A) ::= ELSEIF expression(B) eol statement_block(C). { A = new AstElseIfExpression(ctx, B, C); }
+elseifs(A) ::= elseifs(B) elseifs(C). { A = B; assert(A->tail != NULL); A->tail->next = C; A->tail = C; }
+
+%type do_statement { AstDoStatement * }
+%destructor do_statement { delete $$; }
+do_statement(A) ::= DO eol statement_block(B) LOOP WHILE expression(C) eol. { A = new AstDoStatement(ctx, B, C, 0); }
+do_statement(A) ::= DO eol statement_block(B) LOOP UNTIL expression(C) eol. { A = new AstDoStatement(ctx, B, C, 1); }
+do_statement(A) ::= DO eol statement_block(B) LOOP eol. { A = new AstDoStatement(ctx, B, NULL, 0); }
+
+%type for_statement { AstForStatement * }
+%destructor for_statement { delete $$; }
+for_statement(A) ::= FOR IDENTIFIER(B) ASSIGN expression(C) TO expression(D) eol statement_block(E) NEXT eol. { A = new AstForStatement(ctx, B, C, D, E, NULL); }
+for_statement(A) ::= FOR IDENTIFIER(B) ASSIGN expression(C) TO expression(D) STEP expression(E) eol statement_block(F) NEXT eol. { A = new AstForStatement(ctx, B, C, D, E, F); }
+
+%type select_statement { AstSelectStatement * }
+%destructor select_statement { delete $$; }
+select_statement(A) ::= SELECT CASE expression(B) eol cases(C) END SELECT eol. { A = new AstSelectStatement(ctx, B, C, NULL); }
+select_statement(A) ::= SELECT CASE expression(B) eol cases(C) CASE ELSE statement_block(D) END SELECT eol. { A = new AstSelectStatement(ctx, B, C, D); }
+
+%type cases { AstCaseStatement * }
+%destructor cases { delete $$; }
+cases(A) ::= CASE expression(B) eol statement_block(C). { A = new AstCaseStatement(ctx, B, C); }
+cases(A) ::= cases(B) cases(C). { A = B; assert(A->tail != NULL); A->tail->next = C; A->tail = C; }
+
+%type exit_statement { AstStatement * }
+%destructor exit_statement { delete $$; }
+exit_statement(A) ::= EXIT FUNCTION eol. { A = new AstExitStatement(ctx, 1); }
+exit_statement(A) ::= EXIT FOR eol. { A = new AstExitStatement(ctx, 2); }
+exit_statement(A) ::= EXIT DO eol. { A = new AstExitStatement(ctx, 3); }
+exit_statement(A) ::= EXIT WHILE eol. { A = new AstExitStatement(ctx, 4); }
+
+%type print_statement { AstStatement * }
+%destructor print_statement { delete $$; }
+print_statement(A) ::= PRINT eol. { A = new AstPrintStatement(ctx, NULL, 1); }
+print_statement(A) ::= PRINT SEMICOLON eol. { A = new AstPrintStatement(ctx, NULL, 0); }
+print_statement(A) ::= PRINT print_list(B) eol. { A = new AstPrintStatement(ctx, B, 0); }
+
+%type print_list { AstPrintList * }
+%destructor print_list { delete $$; }
+print_list(A) ::= expression(B). { A = new AstPrintList(ctx, B); }
+// !!! FIXME
+//print_list(A) ::= print_list(B) SEMICOLON expression(C).
+//print_list(A) ::= print_list(B) SEMICOLON.
+
+%type view_print_statement { AstStatement * }
+%destructor view_print_statement { delete $$; }
+view_print_statement(A) ::= VIEW PRINT expression(B) TO expression(C) eol. { A = new AstViewPrintStatement(ctx, B, C); }
+
+%type line_input_statement { AstStatement * }
+%destructor line_input_statement { delete $$; }
+line_input_statement(A) ::= LINE INPUT expression(B) COMMA IDENTIFIER(C) eol. { A = new AstLineInputStatement(ctx, B, C); }
+
+%type expression { AstExpression * }
+%destructor expression { delete $$; }
+expression(A) ::= expression(B) OR expression(C). { A = new AstBinaryOrExpression(ctx, B, C); }
+expression(A) ::= expression(B) AND expression(C). { A = new AstBinaryAndExpression(ctx, B, C); }
+expression(A) ::= expression(B) XOR expression(C). { A = new AstBinaryXorExpression(ctx, B, C); }
+expression(A) ::= expression(B) ASSIGN expression(C). { A = new AstEqualExpression(ctx, B, C); }
+expression(A) ::= expression(B) NEQ expression(C). { A = new AstNotEqualExpression(ctx, B, C); }
+expression(A) ::= expression(B) LT expression(C). { A = new AstLessThanExpression(ctx, B, C); }
+expression(A) ::= expression(B) GT expression(C). { A = new AstGreaterThanExpression(ctx, B, C); }
+expression(A) ::= expression(B) LEQ expression(C). { A = new AstLessThanOrEqualExpression(ctx, B, C); }
+expression(A) ::= expression(B) GEQ expression(C). { A = new AstGreaterThanOrEqualExpression(ctx, B, C); }
+expression(A) ::= expression(B) PLUS expression(C). { A = new AstAddExpression(ctx, B, C); }
+expression(A) ::= expression(B) MINUS expression(C). { A = new AstSubtractExpression(ctx, B, C); }
+expression(A) ::= expression(B) STAR expression(C). { A = new AstMultiplyExpression(ctx, B, C); }
+expression(A) ::= expression(B) SLASH expression(C). { A = new AstDivideExpression(ctx, B, C); }
+expression(A) ::= expression(B) BACKSLASH expression(C). { A = new AstIntegerDivideExpression(ctx, B, C); }
+expression(A) ::= expression(B) MOD expression(C). { A = new AstModuloExpression(ctx, B, C); }
+expression(A) ::= HASH expression(B). { A = new AstFileIdExpression(ctx, B); }
+expression(A) ::= PLUS expression(B). { A = B; }  // unary "+x" is always a no-op, so throw it away here.
+expression(A) ::= MINUS expression(B). { A = new AstNegateExpression(ctx, B); }
+expression(A) ::= NOT expression(B). { A = new AstNotExpression(ctx, B); }
+//expression(A) ::= IDENTIFIER(B) LPAREN expression(C) RPAREN. { A = new AstDereferenceArrayExpression(ctx, B, C); }
+expression(A) ::= struct_deref(B). { A = B; }
+expression(A) ::= IDENTIFIER(B). { A = new AstIdentifierExpression(ctx, B.string); }
+expression(A) ::= INT_CONSTANT(B). { A = new AstIntLiteralExpression(ctx, B.i64); }
+expression(A) ::= FLOAT_CONSTANT(B). { A = new AstFloatLiteralExpression(ctx, B.dbl); }
+
+// !!! FIXME: Visual Basic added this, I think.
+//expression(A) ::= TRUE. { A = new AstBooleanLiteralExpression(ctx, true); }
+//expression(A) ::= FALSE. { A = new AstBooleanLiteralExpression(ctx, false); }
+
+expression(A) ::= LPAREN expression(B) RPAREN. { A = B; }
+//expression(A) ::= IDENTIFIER(B) LPAREN expression_list(C) RPAREN. { A = new AstFunctionCallExpression(ctx, B.string, C); }
+
+%type expression_list { AstExpressionList * }
+%destructor expression_list { delete $$; }
+expression_list(A) ::= expression(B). { A = new AstExpressionList(ctx, B); }
+expression_list(A) ::= expression_list(B) COMMA expression(C). { A = B; A->append(C); }
+
+// end of mojobasic_parser.lemon ...
+
