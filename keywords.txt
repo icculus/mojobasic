@@ -1,0 +1,269 @@
+// this is what's in QBasic...QB4.5 and VBDOS (and Visual Basic proper!!) have more...way more in VB's case.
+A
+ABS Function
+ABSOLUTE Keyword
+ACCESS Keyword
+AND Operator
+ANY Keyword
+APPEND Keyword
+AS Keyword
+ASC Function
+ATN Function
+B
+BASE Keyword
+Basic Character Set
+BEEP Statement
+BINARY Keyword
+BLOAD Statement
+Boolean Operators
+BSAVE Statement
+C
+CALL ABSOLUTE Statement
+CALL Statement
+CASE Keyword
+CDBL Function
+CHAIN Statement
+CHDIR Statement
+CHR$ Function
+CINT Function
+CIRCLE Statement
+CLEAR Statement
+CLNG Function
+CLOSE Statement
+CLS Statement
+COLOR Statement
+COM Statement
+COMMON Statement
+CONST Statement
+COS Function
+CSNG Function
+CSRLIN Function
+CVD Function
+CVDMBF Function
+CVI Function
+CVL Function
+CVS Function
+CVSMBF Function
+D
+DATA Statement
+Data Type Keywords
+DATE$ Function
+DATE$ Statement
+DECLARE Statement
+DEF FN Statement
+DEF SEG Statement
+DEFDBL Statement
+DEFINT Statement
+DEFLNG Statement
+DEFSNG Statement
+DEFSTR Statement
+DIM Statement
+DO...LOOP Statement
+DOUBLE Keyword
+DRAW Statement
+$DYNAMIC Metacommand
+E
+ELSE Keyword
+ELSEIF Keyword
+END Statement
+ENVIRON Statement
+ENVIRON$ Function
+EOF Function
+EQV Operator
+ERASE Statement
+ERDEV Function
+ERDEV$ Function
+ERL Function
+ERR Function
+ERROR Statement
+EXIT Statement
+EXP Function
+F
+FIELD Statement
+FILEATTR Function
+FILES Statement
+FIX Function
+FOR...NEXT Statement
+FRE Function
+FREEFILE Function
+FUNCTION Statement
+G
+GET (File I/O) Statement
+GET (Graphics) Statement
+GOSUB Statement
+GOTO Statement
+H
+HEX$ Function
+ 	 
+I
+IF...THEN...ELSE Statement
+IMP Operator
+INKEY$ Function
+INP Function
+INPUT Statement
+INPUT$ Function
+INSTR Function
+INT Function
+INTEGER Keyword
+IOCTL Statement
+IOCTL$ Function
+IS Keyword
+K
+KEY (Assignment) Statement
+KEY (Event Trapping) Statement
+KILL Statement
+L
+LBOUND Function
+LCASE$ Function
+LEFT$ Function
+LEN Function
+LET Statement
+LINE (Graphics) Statement
+LINE INPUT Statement
+LIST Keyword
+LOC Function
+LOCATE Statement
+LOCK...UNLOCK Statements
+LOF Function
+LOG Function
+LONG Keyword
+LOOP Keyword
+LPOS Function
+LPRINT Statement
+LPRINT USING Statement
+LSET Statement
+LTRIM$ Function
+M
+MID$ Function
+MID$ Statement
+MKD$ Function
+MKDIR Statement
+MKDMBF$ Function
+MKI$ Function
+MKL$ Function
+MKS$ Function
+MKSMBF$ Function
+MOD Operator
+N
+NAME Statement
+NEXT Keyword
+NOT Operator
+O
+OCT$ Function
+OFF Keyword
+ON COM Statement
+ON ERROR Statement
+ON KEY Statement
+ON Keyword
+ON PEN Statement
+ON PLAY Statement
+ON STRIG Statement
+ON TIMER Statement
+ON...GOSUB Statement
+ON...GOTO Statement
+OPEN COM Statement
+OPEN Statement
+OPTION BASE Statement
+OR Operator
+OUT Statement
+OUTPUT Keyword
+P
+PAINT Statement
+PALETTE Statements
+PCOPY Statement
+PEEK Function
+PEN Function
+PEN Statement
+PLAY (Event Trapping) Statements
+PLAY (Music) Statement
+PLAY Function
+PMAP Function
+POINT Function
+POKE Statement
+POS Function
+PRESET Statement
+PRINT Statement
+PRINT USING Statement
+PSET Statement
+PUT (File I/O) Statement
+PUT (Graphics) Statement
+R
+RANDOM Keyword
+RANDOMIZE Statement
+READ Statement
+REDIM Statement
+REM Statement
+RESET Statement
+RESTORE Statement
+RESUME Statement
+RETURN Statement
+RIGHT$ Function
+RMDIR Statement
+RND Function
+RSET Statement
+RTRIM$ Function
+RUN Statement
+S
+SCREEN Function
+SCREEN Statement
+SEEK Function
+SEEK Statement
+SELECT CASE Statement
+SGN Function
+SHARED Statement
+SHELL Statement
+SIN Function
+SINGLE Keyword
+SLEEP Statement
+SOUND Statement
+SPACE$ Function
+SPC Function
+SQR Function
+STATIC Statement
+$STATIC Metacommand
+STEP Keyword
+STICK Function
+STOP Statement
+STR$ Function
+STRIG Function
+STRIG Statements
+STRING Keyword
+STRING$ Function
+SUB Statement
+SWAP Statement
+SYSTEM Statement
+T
+TAB Function
+TAN Function
+THEN Keyword
+TIME$ Function
+TIME$ Statement
+TIMER Function
+TIMER Statements
+TO Keyword
+TROFF Statement
+TRON Statement
+TYPE Statement
+U
+UBOUND Function
+UCASE$ Function
+UNLOCK Statement
+UNTIL Keyword
+USING Keyword
+V
+VAL Function
+VARPTR Function
+VARPTR$ Function
+VARSEG Function
+VIEW PRINT Statement
+VIEW Statement
+W
+WAIT Statement
+WEND Keyword
+WHILE...WEND Statement
+WIDTH Statements
+WINDOW Statement
+WRITE Statement
+X
+XOR Operator
+ 	 
