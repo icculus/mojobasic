@@ -51,7 +51,7 @@ public:
     void pop_source();
 
     const char *nextToken(unsigned int *_len, Token *_token);
-    const char *getSourcePosition(unsigned int *pos) const;
+    const char *getSourcePosition(SourcePosition &pos) const;
 
 private:
     bool isfail;
@@ -91,16 +91,17 @@ Preprocessor::~Preprocessor()
         pop_source();
 } // Preprocessor::~Preprocessor
 
-const char *Preprocessor::getSourcePosition(unsigned int *pos) const
+void Preprocessor::getSourcePosition(SourcePosition &pos) const
 {
     if (include_stack == NULL)
     {
-        *pos = 0;
+        pos.filename = "";
+        pos.line = 0;
         return NULL;
     } // if
 
-    *pos = include_stack->line;
-    return include_stack->filename;
+    pos.filename = include_stack->filename;
+    pos.line = include_stack->line;
 } // Preprocessor::getSourcePosition
 
 void Preprocessor::failf(const char *fmt, ...)
@@ -444,9 +445,9 @@ const char *preprocessor_nexttoken(Preprocessor *pp, unsigned int *len,
     return retval;
 } // preprocessor_nexttoken
 
-const char *preprocessor_sourcepos(Preprocessor *pp, unsigned int *pos)
+void preprocessor_sourcepos(Preprocessor *pp, SourcePosition &pos)
 {
-    return pp->getSourcePosition(pos);
+    pp->getSourcePosition(pos);
 } // preprocessor_sourcepos
 
 

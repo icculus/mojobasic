@@ -84,7 +84,7 @@ scanner_loop:
 
 /*!re2c
     "'" { goto singlelinecomment; }
-    "REM" NEWLINE { s->line++; RET('\n'); }
+    "REM" NEWLINE { s->position.line++; RET(TOKEN_NEWLINE); }
     "REM" WHITESPACE { goto singlelinecomment; }
 
     L (L|D)* SUFFIX?       { RET(TOKEN_IDENTIFIER); }
@@ -94,24 +94,25 @@ scanner_loop:
     "<="            { RET(TOKEN_LEQ); }
     ">="            { RET(TOKEN_GEQ); }
     "<>"            { RET(TOKEN_NEQ); }
-    "("             { RET('('); }
-    ")"             { RET(')'); }
-    "."             { RET('.'); }
-    ","             { RET(','); }
-    "-"             { RET('-'); }
-    "+"             { RET('+'); }
-    "*"             { RET('*'); }
-    "/"             { RET('/'); }
-    "<"             { RET('<'); }
-    ">"             { RET('>'); }
-    ":"             { RET(':'); }
-    "="             { RET('='); }
-    ";"             { RET(';'); }
+    "("             { RET(TOKEN_LPAREN); }
+    ")"             { RET(TOKEN_RPAREN); }
+    "."             { RET(TOKEN_DOT); }
+    ","             { RET(TOKEN_COMMA); }
+    "-"             { RET(TOKEN_MINUS); }
+    "+"             { RET(TOKEN_PLUS); }
+    "*"             { RET(TOKEN_STAR); }
+    "/"             { RET(TOKEN_SLASH); }
+    "\\"            { RET(TOKEN_BACKSLASH); }
+    "<"             { RET(TOKEN_LESSTHAN); }
+    ">"             { RET(TOKEN_GREATERTHAN); }
+    ":"             { RET(TOKEN_COLON); }
+    "="             { RET(TOKEN_ASSIGN); }
+    ";"             { RET(TOKEN_SEMICOLON); }
 
     "\000"          { if (eoi) { RET(TOKEN_EOI); } goto bad_chars; }
 
-    WHITESPACE      { if (s->report_whitespace) RET(' '); goto scanner_loop; }
-    NEWLINE         { s->line++; RET('\n'); }
+    WHITESPACE      { if (s->report_whitespace) RET(TOKEN_WHITESPACE); goto scanner_loop; }
+    NEWLINE         { s->position.line++; RET(TOKEN_NEWLINE); }
     ANY             { goto bad_chars; }
 */
 
@@ -131,14 +132,14 @@ singlelinecomment_loop:
 
 /*!re2c
     NEWLINE         {
-                        s->line++;
+                        s->position.line++;
                         if (s->report_comments)
                         {
-                            cursor = matchptr;  // so we RET('\n') next.
+                            cursor = matchptr;  // so we RET(TOKEN_NEWLINE) next.
                             RET(TOKEN_SINGLE_COMMENT);
                         }
                         token = matchptr;
-                        RET('\n');
+                        RET(TOKEN_NEWLINE);
                     }
     "\000"          {
                         if (eoi)
