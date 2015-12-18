@@ -71,6 +71,7 @@ private:
     AstStatement *parseOn();
     AstIfStatement *parseIf();
     AstStatement *parseEnd();
+    AstExpression *parseExpression();
 
     void *ctx;
     StringCache &strcache;
@@ -553,6 +554,10 @@ AstStatement *Parser::parseEnd() {
     // !!! FIXME: write me
     return NULL;
 } // Parser::parseEnd
+
+AstExpression *Parser::parseExpression() {
+    return NULL;
+}
 
 
 //assignment_statement
