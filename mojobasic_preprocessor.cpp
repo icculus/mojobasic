@@ -51,7 +51,7 @@ public:
     void pop_source();
 
     const char *nextToken(unsigned int *_len, Token *_token);
-    const char *getSourcePosition(SourcePosition &pos) const;
+    void getSourcePosition(SourcePosition &pos) const;
 
 private:
     bool isfail;
@@ -97,11 +97,10 @@ void Preprocessor::getSourcePosition(SourcePosition &pos) const
     {
         pos.filename = "";
         pos.line = 0;
-        return NULL;
+        return;
     } // if
 
-    pos.filename = include_stack->filename;
-    pos.line = include_stack->line;
+    pos = include_stack->position;
 } // Preprocessor::getSourcePosition
 
 void Preprocessor::failf(const char *fmt, ...)
@@ -255,7 +254,8 @@ void Preprocessor::push_source(const char *fname, const char *source,
                               MOJOBASIC_includeClose close_callback)
 {
     IncludeState *state = include_pool.allocate();
-    state->filename = fname ? filename_cache.cache(fname) : NULL;
+    state->position.filename = fname ? filename_cache.cache(fname) : NULL;
+    state->position.line = linenum;
     state->close_callback = close_callback;
     state->source_base = source;
     state->source = source;
@@ -263,7 +263,6 @@ void Preprocessor::push_source(const char *fname, const char *source,
     state->tokenval = ((Token) '\n');
     state->orig_length = srclen;
     state->bytes_left = srclen;
-    state->line = linenum;
     state->next = include_stack;
 
     print_debug_lexing_position(state);
@@ -425,7 +424,6 @@ const char *Preprocessor::nextToken(unsigned int *_len, Token *_token)
         else if (token == ((Token) '\n'))
             print_debug_lexing_position(state);
 
-        assert(!skipping);
         *_token = token;
         *_len = state->tokenlen;
         return state->token;

@@ -504,7 +504,6 @@ struct IncludeState
                      close_callback(NULL), next(NULL) {}
 
     SourcePosition position;
-    const char *filename;
     const char *source_base;
     const char *source;
     const char *token;
