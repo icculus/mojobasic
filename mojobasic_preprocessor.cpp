@@ -33,8 +33,8 @@ static Token debug_preprocessor_lexer(IncludeState *s)
 #if DEBUG_TOKENIZER
 static void print_debug_lexing_position(IncludeState *s)
 {
-    if (s != NULL)
-        printf("NOW LEXING %s:%d ...\n", s->filename, s->line);
+//    if (s != NULL)
+//        printf("NOW LEXING %s:%d ...\n", s->filename, s->line);
 } // print_debug_lexing_position
 #else
 #define print_debug_lexing_position(s)
@@ -127,6 +127,10 @@ static void MOJOBASIC_print_debug_token(const char *subsystem, const char *token
     {
         if (token[i] == '\n')
             printf("\\n");
+        else if (token[i] == '\r')
+            printf("\\r");
+        else if (token[i] == '\t')
+            printf("\\t");
         else if (token[i] == '\\')
             printf("\\\\");
         else
@@ -136,6 +140,23 @@ static void MOJOBASIC_print_debug_token(const char *subsystem, const char *token
     switch ((size_t) tokenval)
     {
         #define TOKENCASE(x) case x: printf("%s", #x); break
+        TOKENCASE(TOKEN_LPAREN);
+        TOKENCASE(TOKEN_RPAREN);
+        TOKENCASE(TOKEN_DOT);
+        TOKENCASE(TOKEN_COMMA);
+        TOKENCASE(TOKEN_MINUS);
+        TOKENCASE(TOKEN_PLUS);
+        TOKENCASE(TOKEN_STAR);
+        TOKENCASE(TOKEN_SLASH);
+        TOKENCASE(TOKEN_BACKSLASH);
+        TOKENCASE(TOKEN_LESSTHAN);
+        TOKENCASE(TOKEN_GREATERTHAN);
+        TOKENCASE(TOKEN_EXPONENT);
+        TOKENCASE(TOKEN_COLON);
+        TOKENCASE(TOKEN_ASSIGN);
+        TOKENCASE(TOKEN_SEMICOLON);
+        TOKENCASE(TOKEN_NEWLINE);
+        TOKENCASE(TOKEN_WHITESPACE);
         TOKENCASE(TOKEN_UNKNOWN);
         TOKENCASE(TOKEN_IDENTIFIER);
         TOKENCASE(TOKEN_INT_LITERAL);
@@ -150,19 +171,53 @@ static void MOJOBASIC_print_debug_token(const char *subsystem, const char *token
         TOKENCASE(TOKEN_PREPROCESSING_ERROR);
         TOKENCASE(TOKEN_METACOMMAND);
         TOKENCASE(TOKEN_PP_INCLUDE);
+        TOKENCASE(TOKEN_AS);
+        TOKENCASE(TOKEN_CLOSE);
+        TOKENCASE(TOKEN_CONST);
+        TOKENCASE(TOKEN_DECLARE);
+        TOKENCASE(TOKEN_DEFDBL);
+        TOKENCASE(TOKEN_DEFINT);
+        TOKENCASE(TOKEN_DEFLNG);
+        TOKENCASE(TOKEN_DEFSNG);
+        TOKENCASE(TOKEN_DEFSTR);
+        TOKENCASE(TOKEN_DIM);
+        TOKENCASE(TOKEN_DO);
+        TOKENCASE(TOKEN_DYNAMIC);
+        TOKENCASE(TOKEN_ELSE);
+        TOKENCASE(TOKEN_ELSEIF);
+        TOKENCASE(TOKEN_END);
+        TOKENCASE(TOKEN_ERROR);
+        TOKENCASE(TOKEN_EXIT);
+        TOKENCASE(TOKEN_FOR);
+        TOKENCASE(TOKEN_FUNCTION);
+        TOKENCASE(TOKEN_IF);
+        TOKENCASE(TOKEN_LINE);
+        TOKENCASE(TOKEN_LOCAL);
+        TOKENCASE(TOKEN_ON);
+        TOKENCASE(TOKEN_OPEN);
+        TOKENCASE(TOKEN_PRINT);
+        TOKENCASE(TOKEN_REDIM);
+        TOKENCASE(TOKEN_SELECT);
+        TOKENCASE(TOKEN_STATIC);
+        TOKENCASE(TOKEN_SUB);
+        TOKENCASE(TOKEN_THEN);
+        TOKENCASE(TOKEN_TYPE);
+        TOKENCASE(TOKEN_VIEW);
+        TOKENCASE(TOKEN_WHILE);
+        TOKENCASE(TOKEN_MOD);
+        TOKENCASE(TOKEN_AND);
+        TOKENCASE(TOKEN_OR);
+        TOKENCASE(TOKEN_XOR);
+        TOKENCASE(TOKEN_EQV);
+        TOKENCASE(TOKEN_IMP);
+        TOKENCASE(TOKEN_NOT);
+        TOKENCASE(TOKEN_SHARED);
+        TOKENCASE(TOKEN_TO);
         #undef TOKENCASE
 
-        case ((Token) '\n'):
-            printf("'\\n'");
-            break;
-
-        case ((Token) '\\'):
-            printf("'\\\\'");
-            break;
-
         default:
-            assert(((int)tokenval) < 256);
-            printf("'%c'", (char) tokenval);
+            assert(!"shouldn't hit this. Missing token?");
+            printf("? ? ?");
             break;
     } // switch
     printf(")\n");

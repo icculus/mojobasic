@@ -11,12 +11,19 @@
 
 struct StatementCollector
 {
-    StatementCollector(const SourcePosition &pos) : position(pos), start(SourcePosition()), tail(&start) {}
+    StatementCollector(const SourcePosition &pos) : start(pos), tail(&start) {}
     virtual ~StatementCollector() { start.next = NULL; }
-    AstStatementBlock *newStatementBlock() { return new AstStatementBlock(position, start.next); start.next = NULL; tail = &start; }
+    AstStatementBlock *newStatementBlock() { return new AstStatementBlock(start.position, start.next); start.next = NULL; tail = &start; }
     AstExitStatement start;  // just picked a simple not-pure-virtual class.
     AstStatement *tail;
-    const SourcePosition position;
+};
+
+struct VariableDeclarationCollector
+{
+    VariableDeclarationCollector(const SourcePosition &pos) : start(pos, NULL, NULL, -1, NULL, NULL), tail(&start) {}
+    virtual ~VariableDeclarationCollector() { start.next = NULL; }
+    AstVariableDeclaration start;
+    AstVariableDeclaration *tail;
 };
 
 struct TokenData
@@ -58,8 +65,9 @@ private:
     AstProcedureSignature *parseProcedureSignature(const bool bIsFunction);
     AstProcedure *parseProcedure(const bool bIsFunction);
     AstConstStatement *parseConst();
-    AstVariableDeclarationStatement *parseVarDeclaration();
+    AstVariableDeclaration *parseVarDeclaration();
     AstTypeDeclarationStatement *parseType();
+    AstVariableDeclarationStatement *parseDim();
     bool parseDefLetterRange(char *a, char *z);
     AstDefStatement *parseDefType(const char *typ);
     AstDefStatement *parseDefInt() { return parseDefType("I"); }
@@ -71,11 +79,15 @@ private:
     AstStatement *parseOn();
     AstIfStatement *parseIf();
     AstStatement *parseEnd();
-    AstExpression *parseExpression();
+    AstExpression *parseExpression(const int precedence=0);
+    AstExpression *parseSubExpression();
+    Token wantBinaryOperator();
+    Token wantUnaryOperator();
 
     void *ctx;
     StringCache &strcache;
     Preprocessor *pp;
+    TokenData previousToken;
     TokenData currentToken;
 };
 
@@ -142,13 +154,16 @@ void Parser::convertToParserToken(TokenData &data)
     else if (data.tokenval == TOKEN_FLOAT_LITERAL)
         data.dbl = strtodouble(data.token, data.tokenlen);
 
+    else if (data.tokenval == TOKEN_STRING_LITERAL)
+        data.string = strcache.cache(data.token+1, data.tokenlen - 2);  // cache the string but not the quotes.
+
     else if (data.tokenval == TOKEN_IDENTIFIER)    // need to see if this is actually a keyword, or really an identifier.
     {
         char *buf = (char *) alloca(data.tokenlen);  // !!! FIXME: this stinks.
         for (size_t i = 0; i < data.tokenlen; i++)
         {
             const char ch = data.token[i];
-            buf[i] = ((ch >= 'A') && (ch <= 'Z')) ? (ch + ('A' - 'a')) : ch;
+            buf[i] = ((ch >= 'a') && (ch <= 'z')) ? (ch - ('a' - 'A')) : ch;
         } // for
 
         data.string = strcache.cache(buf, data.tokenlen);
@@ -189,6 +204,15 @@ void Parser::convertToParserToken(TokenData &data)
         TOKENCMP(TYPE);
         TOKENCMP(VIEW);
         TOKENCMP(WHILE);
+        TOKENCMP(MOD);
+        TOKENCMP(AND);
+        TOKENCMP(OR);
+        TOKENCMP(XOR);
+        TOKENCMP(EQV);
+        TOKENCMP(IMP);
+        TOKENCMP(NOT);
+        TOKENCMP(SHARED);
+        TOKENCMP(TO);
         #undef TOKENCMP
     } // if
 } // Parser::convertToParserToken
@@ -197,6 +221,7 @@ AstProgram *Parser::run(const char *filename, const char *source, unsigned int s
 {
     pp = preprocessor_start(filename, source, sourcelen, include_open, include_close);
 
+    memset(&currentToken, '\0', sizeof (currentToken));
     getNextToken();
     const SourcePosition startpos(currentToken.position);
 
@@ -212,6 +237,7 @@ AstProgram *Parser::run(const char *filename, const char *source, unsigned int s
 
 Token Parser::getNextToken()
 {
+    previousToken = currentToken;
     while (true)
     {
         currentToken.token = preprocessor_nexttoken(pp, &currentToken.tokenlen, &currentToken.tokenval);
@@ -295,13 +321,13 @@ AstStatement *Parser::parseStatement() {
     else if (want(TOKEN_SUB)) return parseProcedure(false);
     else if (want(TOKEN_CONST)) return parseConst();
     else if (want(TOKEN_TYPE)) return parseType();
+    else if (want(TOKEN_DIM)) return parseDim();
     else if (want(TOKEN_DEFINT)) return parseDefInt();
     else if (want(TOKEN_DEFSNG)) return parseDefSng();
     else if (want(TOKEN_DEFDBL)) return parseDefDbl();
     else if (want(TOKEN_DEFLNG)) return parseDefLng();
     else if (want(TOKEN_DEFSTR)) return parseDefStr();
     else if (want(TOKEN_ON)) return parseOn();
-    //else if (want(TOKEN_DIM)) return parseDim();
     //else if (want(TOKEN_REDIM)) return parseReDim();
     else if (want(TOKEN_IF)) return parseIf();
     //else if (want(TOKEN_FOR)) return parseFor();
@@ -321,7 +347,9 @@ AstStatement *Parser::parseStatement() {
 
     //else if (want(TOKEN_IDENTIFIER)) return parseIdentifierStatement();
 
-    return NULL;  // nothing we handle here.
+    // nothing we handle here. Dump to end of statement and continue.
+    dumpUntilEndOfStatement();
+    return NULL;
 } // Parser::parseStatement
 
 bool Parser::parseStatements(StatementCollector &collector) {
@@ -349,15 +377,15 @@ AstStatement *Parser::parseMetacommand() {  // !!! FIXME: maybe move this into t
 } // Parser::parseMetacommand()
 
 AstProcedureSignature *Parser::parseProcedureSignature(const bool bIsFunction) {
-    const SourcePosition position(currentToken.position);
+    const SourcePosition position(previousToken.position);
     if (!need(TOKEN_IDENTIFIER, "Expected identifier")) return NULL;
-    const char *identifier = currentToken.string;  // these are strcache()'d.
-    StatementCollector collector(currentToken.position);
+    const char *identifier = previousToken.string;  // these are strcache()'d.
+    VariableDeclarationCollector collector(currentToken.position);
     if (want(TOKEN_LPAREN)) {
-        AstStatement *stmt;
-        while ((stmt = parseVarDeclaration()) != NULL) {
-            collector.tail->next = stmt;
-            collector.tail = stmt;
+        AstVariableDeclaration *decl;
+        while ((decl = parseVarDeclaration()) != NULL) {
+            collector.tail->next = decl;
+            collector.tail = decl;
             if (!want(TOKEN_COMMA)) break;
         }
         need(TOKEN_RPAREN, "Expected ')'");
@@ -366,18 +394,16 @@ AstProcedureSignature *Parser::parseProcedureSignature(const bool bIsFunction) {
     const char *rettype = NULL;
     if (bIsFunction && want(TOKEN_AS)) {
         if (need(TOKEN_IDENTIFIER, "Expected datatype"))
-            rettype = currentToken.string;  //  these are strcache()'d.
+            rettype = previousToken.string;  //  these are strcache()'d.
     } // if
 
-    needEndOfStatement();
-
-    AstProcedureSignature *retval = new AstProcedureSignature(position, bIsFunction, identifier, (AstVariableDeclarationStatement *) collector.start.next, rettype);
+    AstProcedureSignature *retval = new AstProcedureSignature(position, bIsFunction, identifier, collector.start.next, rettype);
     collector.start.next = NULL;  // prevent destruction.
     return retval;
 } // Parser::parseProcedureSignature
 
 AstProcedureDeclaration *Parser::parseDeclare() {
-    const SourcePosition position(currentToken.position);
+    const SourcePosition position(previousToken.position);
     const bool bIsFunction = want(TOKEN_FUNCTION);
     if (!bIsFunction && !need(TOKEN_SUB, "Expected FUNCTION or SUB")) return NULL;
     AstProcedureSignature *sig = parseProcedureSignature(bIsFunction);
@@ -385,9 +411,11 @@ AstProcedureDeclaration *Parser::parseDeclare() {
 } // Parser::parseDeclare
 
 AstProcedure *Parser::parseProcedure(const bool bIsFunction) {
-    const SourcePosition position(currentToken.position);
+    const SourcePosition position(previousToken.position);
     AstProcedureSignature *sig = parseProcedureSignature(bIsFunction);
     if (!sig) return NULL;
+
+    needEndOfStatement();
 
     StatementCollector collector(currentToken.position);
     while (true) {
@@ -411,43 +439,78 @@ AstProcedure *Parser::parseProcedure(const bool bIsFunction) {
 } // Parser::parseProcedure
 
 AstConstStatement *Parser::parseConst() {
-    const SourcePosition position(currentToken.position);
+    const SourcePosition position(previousToken.position);
     if (!need(TOKEN_IDENTIFIER, "Expected identifier")) return NULL;
-    const char *identifier = currentToken.string;  // these are strcache()'d.
+    const char *identifier = previousToken.string;  // these are strcache()'d.
     if (!need(TOKEN_ASSIGN, "Expected '='")) return NULL;
     AstExpression *expr = parseExpression();
     if (!expr) return NULL;
     return new AstConstStatement(position, identifier, expr);
 } // Parser::parseConst
 
-AstVariableDeclarationStatement *Parser::parseVarDeclaration() {
+AstVariableDeclaration *Parser::parseVarDeclaration() {
     const SourcePosition position(currentToken.position);
     if (!want(TOKEN_IDENTIFIER)) return NULL;  // maybe end of a variable list?
-    const char *identifier = currentToken.string;  // these are strcache()'d.
-    if (!need(TOKEN_AS, "Expected AS")) return NULL;
-    if (!need(TOKEN_IDENTIFIER, "Expected datatype")) return NULL;
-    const char *datatype = currentToken.string;  // these are strcache()'d.
-    int64 len = 0;
-    int64 *plen = NULL;
-    if (want(TOKEN_STAR) && need(TOKEN_INT_LITERAL, "Expected integer value")) {
-        len = currentToken.i64;
-        plen = &len;
+    const char *identifier = previousToken.string;  // these are strcache()'d.
+
+    AstExpression *lower = NULL;
+    AstExpression *upper = NULL;
+    if (want(TOKEN_LPAREN)) {
+        lower = parseExpression();
+        if (!want(TOKEN_TO)) {  // no TO? it's just the upper value.
+            upper = lower;
+            lower = NULL;
+        } else {
+            upper = parseExpression();
+        }
+        need(TOKEN_RPAREN, "Expected ')'");
     }
 
-    return new AstVariableDeclarationStatement(position, identifier, plen, datatype);
+    const char *datatype = NULL;
+    int64 recordsize = -1;
+    if (want(TOKEN_AS)) {
+        if (need(TOKEN_IDENTIFIER, "Expected datatype")) {
+            datatype = previousToken.string;  // these are strcache()'d.
+            if (want(TOKEN_STAR) && need(TOKEN_INT_LITERAL, "Expected integer value")) {
+                recordsize = previousToken.i64;
+            }
+        }
+    }
+
+    return new AstVariableDeclaration(position, identifier, datatype, recordsize, lower, upper);
 } // Parser::parseVarDeclaration
 
+AstVariableDeclarationStatement *Parser::parseDim() {
+    const SourcePosition position(previousToken.position);
+    const bool bIsShared = want(TOKEN_SHARED);
+
+    VariableDeclarationCollector collector(currentToken.position);
+    AstVariableDeclaration *decl;
+    while ((decl = parseVarDeclaration()) != NULL) {
+        collector.tail->next = decl;
+        collector.tail = decl;
+        if (!want(TOKEN_COMMA)) {
+            break;
+        }
+    }
+
+    AstVariableDeclarationStatement *retval = new AstVariableDeclarationStatement(position, bIsShared, collector.start.next);
+    collector.start.next = NULL;  // prevent destruction.
+    return retval;
+
+}
+
 AstTypeDeclarationStatement *Parser::parseType() {
-    const SourcePosition position(currentToken.position);
+    const SourcePosition position(previousToken.position);
     if (!need(TOKEN_IDENTIFIER, "Expected identifier")) return NULL;
-    const char *identifier = currentToken.string;  // these are strcache()'d.
+    const char *identifier = previousToken.string;  // these are strcache()'d.
     needEndOfLine();  // can't use a ':' here in QB45, dunno why.
 
-    StatementCollector collector(currentToken.position);
-    AstStatement *stmt;
-    while ((stmt = parseVarDeclaration()) != NULL) {
-        collector.tail->next = stmt;
-        collector.tail = stmt;
+    VariableDeclarationCollector collector(currentToken.position);
+    AstVariableDeclaration *decl;
+    while ((decl = parseVarDeclaration()) != NULL) {
+        collector.tail->next = decl;
+        collector.tail = decl;
         needEndOfStatement();
     }
 
@@ -456,7 +519,7 @@ AstTypeDeclarationStatement *Parser::parseType() {
     // !!! FIXME: check this in semantic analysis instead.
     if (collector.start.next == NULL) fail("TYPE with no members");
 
-    AstTypeDeclarationStatement *retval = new AstTypeDeclarationStatement(position, identifier, (AstVariableDeclarationStatement *) collector.start.next);
+    AstTypeDeclarationStatement *retval = new AstTypeDeclarationStatement(position, identifier, collector.start.next);
     collector.start.next = NULL;  // prevent destruction.
     return retval;
 } // Parser::parseType
@@ -464,12 +527,12 @@ AstTypeDeclarationStatement *Parser::parseType() {
 bool Parser::parseDefLetterRange(char *a, char *z) {
     const char *err = "Expected {letter}-{letter}";
     if (!need(TOKEN_IDENTIFIER, err)) return false;
-    const char lo = currentToken.string[0];
-    if (currentToken.string[1] != '\0') { failAndDumpStatement(err); return false; }
+    const char lo = previousToken.string[0];
+    if (previousToken.string[1] != '\0') { failAndDumpStatement(err); return false; }
     if (!need(TOKEN_MINUS, err)) return false;
     if (!need(TOKEN_IDENTIFIER, err)) return false;
-    const char hi = currentToken.string[1];
-    if (currentToken.string[1] != '\0') { failAndDumpStatement(err); return false; }
+    const char hi = previousToken.string[1];
+    if (previousToken.string[1] != '\0') { failAndDumpStatement(err); return false; }
     if ( ! (((lo >= 'a') && (lo <= 'z')) || ((lo >= 'A') && (lo <= 'Z'))) ) { failAndDumpStatement(err); return false; }
     if ( ! (((hi >= 'a') && (hi <= 'z')) || ((hi >= 'A') && (hi <= 'Z'))) ) { failAndDumpStatement(err); return false; }
     *a = lo;
@@ -478,7 +541,7 @@ bool Parser::parseDefLetterRange(char *a, char *z) {
 } // Parser::parseDefLetterRange
 
 AstDefStatement *Parser::parseDefType(const char *typ) {
-    const SourcePosition position(currentToken.position);
+    const SourcePosition position(previousToken.position);
     char a, z;
     return parseDefLetterRange(&a, &z) ? new AstDefStatement(position, typ, a, z) : NULL;
 } // Parser::parseDefType
@@ -495,7 +558,7 @@ AstStatement *Parser::parseOn() {
 } // Parser::parseOn
 
 AstIfStatement *Parser::parseIf() {
-    const SourcePosition position(currentToken.position);
+    const SourcePosition position(previousToken.position);
     AstExpression *expr = parseExpression();
     if (expr == NULL) return NULL;
     need(TOKEN_THEN, "Expected THEN"); // keep going if missing.
@@ -555,9 +618,145 @@ AstStatement *Parser::parseEnd() {
     return NULL;
 } // Parser::parseEnd
 
-AstExpression *Parser::parseExpression() {
+
+// BASIC operator precedence: http://qbasic.phatcode.net/TUT/GDE/APCOPER.HTM#B
+
+Token Parser::wantBinaryOperator() {
+    const Token t = currentToken.tokenval;
+    return (want(TOKEN_EXPONENT) || want(TOKEN_MINUS) || want(TOKEN_STAR) || want(TOKEN_SLASH) || want(TOKEN_BACKSLASH) ||
+            want(TOKEN_MOD) || want(TOKEN_PLUS) || want(TOKEN_ASSIGN) || want(TOKEN_LESSTHAN) || want(TOKEN_GREATERTHAN) ||
+            want(TOKEN_NEQ) || want(TOKEN_LEQ) || want(TOKEN_GEQ) || want(TOKEN_AND) || want(TOKEN_OR) ||
+            want(TOKEN_XOR) || want(TOKEN_EQV) || want(TOKEN_IMP)) ? t : TOKEN_UNKNOWN;
+} // Parser::wantBinaryOperator
+
+static AstExpression *newAstExpressionByOperator(const SourcePosition &position, const Token op, AstExpression *l, AstExpression *r) {
+    switch (op) {
+        case TOKEN_MINUS: return new AstSubtractExpression(position, l, r);
+        case TOKEN_STAR: return new AstMultiplyExpression(position, l, r);
+        case TOKEN_SLASH: return new AstDivideExpression(position, l, r);
+        case TOKEN_BACKSLASH: return new AstIntegerDivideExpression(position, l, r);
+        case TOKEN_MOD: return new AstModuloExpression(position, l, r);
+        case TOKEN_PLUS: return new AstAddExpression(position, l, r);
+        case TOKEN_ASSIGN: return new AstEqualExpression(position, l, r);
+        case TOKEN_LESSTHAN: return new AstLessThanExpression(position, l, r);
+        case TOKEN_GREATERTHAN: return new AstGreaterThanExpression(position, l, r);
+        case TOKEN_NEQ: return new AstNotEqualExpression(position, l, r);
+        case TOKEN_LEQ: return new AstLessThanOrEqualExpression(position, l, r);
+        case TOKEN_GEQ: return new AstGreaterThanOrEqualExpression(position, l, r);
+        case TOKEN_AND: return new AstBinaryAndExpression(position, l, r);
+        case TOKEN_OR: return new AstBinaryOrExpression(position, l, r);
+        case TOKEN_XOR: return new AstBinaryXorExpression(position, l, r);
+        case TOKEN_EQV: return new AstBinaryEqvExpression(position, l, r);
+        case TOKEN_IMP: return new AstBinaryImpExpression(position, l, r);
+        default: break;
+    } // switch
+
+    assert(!"shouldn't hit this");
     return NULL;
+} // newAstExpressionByOperator
+
+Token Parser::wantUnaryOperator() {
+    const Token t = currentToken.tokenval;
+    return (want(TOKEN_PLUS) || want(TOKEN_MINUS) || want(TOKEN_NOT)) ? t : TOKEN_UNKNOWN;
+} // Parser::wantUnaryOperator
+
+static AstExpression *newAstExpressionByOperator(const SourcePosition &position, const Token op, AstExpression *e) {
+    switch (op) {
+        case TOKEN_PLUS: return e; // doesn't mean anything, just drop the operation.
+        case TOKEN_MINUS: return new AstNegateExpression(position, e);
+        case TOKEN_NOT: return new AstNotExpression(position, e);
+        default: break;
+    } // switch
+
+    assert(!"shouldn't hit this");
+    return NULL;
+} // newAstExpressionByOperator
+
+
+
+static int operatorPrecedence(const Token op)
+{
+/*
+According to http://www.qb64.net/forum/index.php?topic=5990.0:
+()
+^
+*, / (left to right)
+\
+MOD
++, - (left to right)
+=, <>, <, >, <=, >= (left to right)
+NOT
+AND
+OR
+XOR, EQV
+IMP
+*/
+    switch (op) {
+        case TOKEN_IMP: return 0;
+        case TOKEN_XOR: return 1;
+        case TOKEN_EQV: return 1;
+        case TOKEN_OR: return 2;
+        case TOKEN_AND: return 3;
+        case TOKEN_NOT: return 4;
+        case TOKEN_ASSIGN: return 5;  // this is '=' comparison operator.
+        case TOKEN_NEQ: return 5;
+        case TOKEN_LESSTHAN: return 5;
+        case TOKEN_GREATERTHAN: return 5;
+        case TOKEN_LEQ: return 5;
+        case TOKEN_GEQ: return 5;
+        case TOKEN_PLUS: return 6;
+        case TOKEN_MINUS: return 6;
+        case TOKEN_MOD: return 7;
+        case TOKEN_BACKSLASH: return 8;
+        case TOKEN_STAR: return 9;
+        case TOKEN_SLASH: return 9;
+        case TOKEN_EXPONENT: return 10;
+        default: break;
+    } // switch
+
+    return -1;
 }
+
+// This is the "Precedence Climbing" algorithm.
+// https://www.engr.mun.ca/~theo/Misc/exp_parsing.htm
+AstExpression *Parser::parseExpression(const int precedence) {
+    AstExpression *l = parseSubExpression();
+    if (l) {
+        Token op;
+        while ((op = wantBinaryOperator()) != TOKEN_UNKNOWN) {
+            const int thisprecedence = operatorPrecedence(op);
+            if (thisprecedence >= precedence) {
+                AstExpression *r = parseExpression(thisprecedence);
+                l = newAstExpressionByOperator(l->position, op, l, r);
+            }
+        }
+    }
+    return l;
+} // Parser::parseExpression
+
+AstExpression *Parser::parseSubExpression() {
+    const SourcePosition position(currentToken.position);
+    Token op;
+    if ((op = wantUnaryOperator()) != TOKEN_UNKNOWN) {
+        const int thisprecedence = operatorPrecedence(op);
+        return newAstExpressionByOperator(position, op, parseExpression(thisprecedence));
+    } else if (want(TOKEN_LPAREN)) {
+        AstExpression *e = parseExpression();
+        need(TOKEN_RPAREN, "Expected ')'");
+        return e;
+    } else if (want(TOKEN_INT_LITERAL)) {
+        return new AstIntLiteralExpression(position, previousToken.i64);
+    } else if (want(TOKEN_FLOAT_LITERAL)) {
+        return new AstFloatLiteralExpression(position, (float) previousToken.dbl);
+    } else if (want(TOKEN_STRING_LITERAL)) {
+        return new AstStringLiteralExpression(position, previousToken.string);
+    } else if (want(TOKEN_IDENTIFIER)) {   // !!! FIXME: need to check array and struct dereferences
+        return new AstIdentifierExpression(position, previousToken.string);
+    }
+
+    failAndDumpStatement("Expected expression");
+    return NULL;
+} // Parser::parseSubExpression
 
 
 //assignment_statement

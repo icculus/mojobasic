@@ -41,6 +41,15 @@ typedef uint64 AstDataType;  // !!! FIXME
 #define AST_DATATYPE_DOUBLE 7
 #define AST_DATATYPE_STRING 8
 
+struct MOJOBASIC_program
+{
+    MOJOBASIC_program() : module(NULL) {}
+    ~MOJOBASIC_program();
+    const char *name;
+    std::vector<MOJOBASIC_error> errors;
+    void *module; //llvm::Module *module;
+};
+
 struct AstProgram;
 struct AstProcedureSignature;
 struct AstProcedureDeclaration;
@@ -49,6 +58,7 @@ struct AstNegateExpression;
 struct AstNotExpression;
 struct AstMultiplyExpression;
 struct AstDivideExpression;
+struct AstIntegerDivideExpression;
 struct AstModuloExpression;
 struct AstAddExpression;
 struct AstSubtractExpression;
@@ -61,12 +71,13 @@ struct AstNotEqualExpression;
 struct AstBinaryAndExpression;
 struct AstBinaryXorExpression;
 struct AstBinaryOrExpression;
-struct AstLogicalAndExpression;
-struct AstLogicalOrExpression;
+struct AstBinaryEqvExpression;
+struct AstBinaryImpExpression;
 struct AstDereferenceArrayExpression;
 struct AstIdentifierExpression;
 struct AstIntLiteralExpression;
 struct AstFloatLiteralExpression;
+struct AstStringLiteralExpression;
 struct AstBooleanLiteralExpression;
 struct AstFunctionCallExpression;
 struct AstExpressionList;
@@ -78,6 +89,7 @@ struct AstDoStatement;
 struct AstWhileStatement;
 struct AstForStatement;
 struct AstConstStatement;
+struct AstVariableDeclaration;
 struct AstVariableDeclarationStatement;
 struct AstTypeDeclarationStatement;
 struct AstDefStatement;
@@ -93,6 +105,7 @@ public:
     virtual void visit(AstNotExpression *node) = 0;
     virtual void visit(AstMultiplyExpression *node) = 0;
     virtual void visit(AstDivideExpression *node) = 0;
+    virtual void visit(AstIntegerDivideExpression *node) = 0;
     virtual void visit(AstModuloExpression *node) = 0;
     virtual void visit(AstAddExpression *node) = 0;
     virtual void visit(AstSubtractExpression *node) = 0;
@@ -105,13 +118,14 @@ public:
     virtual void visit(AstBinaryAndExpression *node) = 0;
     virtual void visit(AstBinaryXorExpression *node) = 0;
     virtual void visit(AstBinaryOrExpression *node) = 0;
-    virtual void visit(AstLogicalAndExpression *node) = 0;
-    virtual void visit(AstLogicalOrExpression *node) = 0;
+    virtual void visit(AstBinaryEqvExpression *node) = 0;
+    virtual void visit(AstBinaryImpExpression *node) = 0;
     virtual void visit(AstDereferenceArrayExpression *node) = 0;
     virtual void visit(AstIdentifierExpression *node) = 0;
     virtual void visit(AstIntLiteralExpression *node) = 0;
     virtual void visit(AstFloatLiteralExpression *node) = 0;
     virtual void visit(AstBooleanLiteralExpression *node) = 0;
+    virtual void visit(AstStringLiteralExpression *node) = 0;
     virtual void visit(AstFunctionCallExpression *node) = 0;
     virtual void visit(AstExpressionList *node) = 0;
     virtual void visit(AstStatementBlock *node) = 0;
@@ -122,6 +136,7 @@ public:
     virtual void visit(AstWhileStatement *node) = 0;
     virtual void visit(AstForStatement *node) = 0;
     virtual void visit(AstConstStatement *node) = 0;
+    virtual void visit(AstVariableDeclaration *node) = 0;
     virtual void visit(AstVariableDeclarationStatement *node) = 0;
     virtual void visit(AstTypeDeclarationStatement *node) = 0;
     virtual void visit(AstDefStatement *node) = 0;
@@ -164,26 +179,40 @@ struct AstExpression : public AstNode
     bool lvalue;
 };
 
-struct AstVariableDeclarationStatement : public AstStatement
+struct AstVariableDeclaration : public AstNode
 {
-    AstVariableDeclarationStatement(const SourcePosition &pos, const char *_identifier, const int64 *_arraylen, const char *_datatype)
-        : AstStatement(pos), identifier(_identifier), datatype(_datatype), ir(NULL)
+    AstVariableDeclaration(const SourcePosition &pos, const char *_identifier, const char *_datatype, const int64 _recordsize, AstExpression *_lower, AstExpression *_upper)
+        : AstNode(pos), identifier(_identifier), datatype(_datatype), recordsize(_recordsize), lower(_lower), upper(_upper), next(NULL)
     {}
-
     virtual void accept(AstVisitor *visitor) { visitor->visit(this); }
     const char *identifier;  //  not a copy, don't delete.
-    const char *datatype;
-    void *ir; //llvm::Value *ir;  // not available until IR generation.
+    const char *datatype;  //  not a copy, don't delete.
+    AstExpression *lower;
+    AstExpression *upper;
+    const int64 recordsize;
+    AstVariableDeclaration *next;
+};
+
+struct AstVariableDeclarationStatement : public AstStatement
+{
+    AstVariableDeclarationStatement(const SourcePosition &pos, const bool _bIsShared, AstVariableDeclaration *_declaration)
+        : AstStatement(pos), declaration(_declaration), bIsShared(_bIsShared), ir(NULL)
+    {}
+    virtual ~AstVariableDeclarationStatement() { delete declaration; }
+    virtual void accept(AstVisitor *visitor) { visitor->visit(this); }
+    AstVariableDeclaration *declaration;
+    const bool bIsShared;
+    void *ir; //llvm::Value *ir;  // NULL until IR generation.
 };
 
 struct AstTypeDeclarationStatement : public AstStatement
 {
-    AstTypeDeclarationStatement(const SourcePosition &pos, const char *_identifier, AstVariableDeclarationStatement *_varlist)
+    AstTypeDeclarationStatement(const SourcePosition &pos, const char *_identifier, AstVariableDeclaration *_varlist)
         : AstStatement(pos), identifier(_identifier), varlist(_varlist) {}
     virtual ~AstTypeDeclarationStatement() { delete varlist; }
     virtual void accept(AstVisitor *visitor) { visitor->visit(this); }
     const char *identifier;  //  not a copy, don't delete.
-    AstVariableDeclarationStatement *varlist;
+    AstVariableDeclaration *varlist;
 };
 
 struct AstDefStatement : public AstStatement
@@ -198,12 +227,12 @@ struct AstDefStatement : public AstStatement
 
 struct AstProcedureSignature : public AstNode
 {
-    AstProcedureSignature(const SourcePosition &pos, const bool bIsFunc, const char *name, AstVariableDeclarationStatement *_args, const char *_rettype) : AstNode(pos), bIsFunction(bIsFunc), identifier(name), args(_args), rettype(_rettype) {}
+    AstProcedureSignature(const SourcePosition &pos, const bool bIsFunc, const char *name, AstVariableDeclaration *_args, const char *_rettype) : AstNode(pos), bIsFunction(bIsFunc), identifier(name), args(_args), rettype(_rettype) {}
     virtual ~AstProcedureSignature() { delete args; }
     virtual void accept(AstVisitor *visitor) { visitor->visit(this); }
     const bool bIsFunction;
     const char *identifier;
-    AstVariableDeclarationStatement *args;
+    AstVariableDeclaration *args;
     const char *rettype;
 };
 
@@ -259,6 +288,7 @@ struct AstBinaryExpression : public AstExpression
 
 AST_BINARY_EXPR_STRUCT(Multiply, MULTIPLY);
 AST_BINARY_EXPR_STRUCT(Divide, DIVIDE);
+AST_BINARY_EXPR_STRUCT(IntegerDivide, DIVIDE);
 AST_BINARY_EXPR_STRUCT(Modulo, MODULO);
 AST_BINARY_EXPR_STRUCT(Add, ADD);
 AST_BINARY_EXPR_STRUCT(Subtract, SUBTRACT);
@@ -271,8 +301,8 @@ AST_BINARY_EXPR_STRUCT(NotEqual, NOTEQUAL);
 AST_BINARY_EXPR_STRUCT(BinaryAnd, BINARYAND);
 AST_BINARY_EXPR_STRUCT(BinaryXor, BINARYXOR);
 AST_BINARY_EXPR_STRUCT(BinaryOr, BINARYOR);
-AST_BINARY_EXPR_STRUCT(LogicalAnd, LOGICALAND);
-AST_BINARY_EXPR_STRUCT(LogicalOr, LOGICALOR);
+AST_BINARY_EXPR_STRUCT(BinaryEqv, BINARYEQV);
+AST_BINARY_EXPR_STRUCT(BinaryImp, BINARYIMP);
 AST_BINARY_EXPR_STRUCT(DereferenceArray, DEREF_ARRAY);
 
 #undef AST_BINARY_EXPR_STRUCT
@@ -282,7 +312,7 @@ struct AstIdentifierExpression : public AstExpression
     AstIdentifierExpression(const SourcePosition &pos, const char *_identifier) : AstExpression(pos), identifier(_identifier), declaration(NULL) {}
     virtual void accept(AstVisitor *visitor) { visitor->visit(this); }
     const char *identifier;  //  not a copy, don't delete.
-    AstVariableDeclarationStatement *declaration;
+    AstVariableDeclaration *declaration;
 };
 
 struct AstIntLiteralExpression : public AstExpression
@@ -304,6 +334,13 @@ struct AstBooleanLiteralExpression : public AstExpression
     AstBooleanLiteralExpression(const SourcePosition &pos, const bool _value) : AstExpression(pos), value(_value) { datatype = AST_DATATYPE_BOOL; }
     virtual void accept(AstVisitor *visitor) { visitor->visit(this); }
     bool value;
+};
+
+struct AstStringLiteralExpression : public AstExpression
+{
+    AstStringLiteralExpression(const SourcePosition &pos, const char *_value) : AstExpression(pos), value(_value) { datatype = AST_DATATYPE_STRING; }
+    virtual void accept(AstVisitor *visitor) { visitor->visit(this); }
+    const char *value;  // this is strcache()'d, don't delete.
 };
 
 struct AstExpressionListItem

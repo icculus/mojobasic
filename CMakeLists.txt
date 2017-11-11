@@ -99,12 +99,10 @@ if(APPLE)
     SET(PLATFORM_LIBS "curses")
 endif()
 
-if (false)
 set_source_files_properties(
     mojobasic_compiler.cpp
     PROPERTIES COMPILE_FLAGS "${LLVM_CXXFLAGS}"
 )
-endif()
 
 find_program(RE2C re2c DOC "Path to re2c command line app: http://re2c.org/")
 if(NOT RE2C)
@@ -119,11 +117,11 @@ else()
     )
 endif()
 
-if (false)
 add_executable(testapp test.cpp)
 target_link_libraries(testapp mojobasic ${LLVM_LIBS} ${PLATFORM_LIBS})
-#set_target_properties(testapp PROPERTIES LINK_FLAGS ${LLVM_LDFLAGS})
+set_target_properties(testapp PROPERTIES LINK_FLAGS "${LLVM_LDFLAGS}")
 
+if(false)
 # Unit tests...
 add_custom_target(
     tests
