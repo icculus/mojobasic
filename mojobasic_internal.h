@@ -488,7 +488,11 @@ enum Token
     TOKEN_IMP,
     TOKEN_NOT,
     TOKEN_SHARED,
-    TOKEN_TO
+    TOKEN_TO,
+    TOKEN_UNTIL,
+    TOKEN_LOOP,
+    TOKEN_CASE,
+    TOKEN_IS
 };
 
 

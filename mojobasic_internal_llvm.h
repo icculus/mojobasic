@@ -80,19 +80,24 @@ struct AstFloatLiteralExpression;
 struct AstStringLiteralExpression;
 struct AstBooleanLiteralExpression;
 struct AstFunctionCallExpression;
+struct AstStructDereferenceExpression;
 struct AstExpressionList;
 struct AstStatementBlock;
 struct AstExitStatement;
+struct AstSubCallStatement;
 struct AstAssignmentStatement;
 struct AstIfStatement;
 struct AstDoStatement;
 struct AstWhileStatement;
 struct AstForStatement;
+struct AstCase;
+struct AstSelectStatement;
 struct AstConstStatement;
 struct AstVariableDeclaration;
 struct AstVariableDeclarationStatement;
 struct AstTypeDeclarationStatement;
 struct AstDefStatement;
+struct AstLineLabel;
 
 class AstVisitor
 {
@@ -127,19 +132,24 @@ public:
     virtual void visit(AstBooleanLiteralExpression *node) = 0;
     virtual void visit(AstStringLiteralExpression *node) = 0;
     virtual void visit(AstFunctionCallExpression *node) = 0;
+    virtual void visit(AstStructDereferenceExpression *node) = 0;
     virtual void visit(AstExpressionList *node) = 0;
     virtual void visit(AstStatementBlock *node) = 0;
     virtual void visit(AstExitStatement *node) = 0;
+    virtual void visit(AstSubCallStatement *node) = 0;
     virtual void visit(AstAssignmentStatement *node) = 0;
     virtual void visit(AstIfStatement *node) = 0;
     virtual void visit(AstDoStatement *node) = 0;
     virtual void visit(AstWhileStatement *node) = 0;
     virtual void visit(AstForStatement *node) = 0;
+    virtual void visit(AstCase *node) = 0;
+    virtual void visit(AstSelectStatement *node) = 0;
     virtual void visit(AstConstStatement *node) = 0;
     virtual void visit(AstVariableDeclaration *node) = 0;
     virtual void visit(AstVariableDeclarationStatement *node) = 0;
     virtual void visit(AstTypeDeclarationStatement *node) = 0;
     virtual void visit(AstDefStatement *node) = 0;
+    virtual void visit(AstLineLabel *node) = 0;
 };
 
 
@@ -345,17 +355,19 @@ struct AstStringLiteralExpression : public AstExpression
 
 struct AstExpressionListItem
 {
-    AstExpressionListItem(AstExpression *_expr) : expr(_expr), next(NULL) {}
+    AstExpressionListItem(AstExpression *_expr, const Token _op=TOKEN_UNKNOWN) : expr(_expr), next(NULL), op(_op) {}
     ~AstExpressionListItem() { delete expr; delete next; }
     AstExpression *expr;
     AstExpressionListItem *next;
+    const Token op;  // this is used for CASE statements.
 };
 
+// !!! FIXME: turn this into a Collector, since we aren't doing a parser grammar?
 struct AstExpressionList : public AstNode
 {
-    AstExpressionList(const SourcePosition &pos, AstExpression *first) : AstNode(pos), list(NULL), tail(NULL) { tail = new AstExpressionListItem(first); list = tail; }
+    AstExpressionList(const SourcePosition &pos, AstExpression *first, const Token op=TOKEN_UNKNOWN) : AstNode(pos), list(NULL), tail(NULL) { tail = new AstExpressionListItem(first, op); list = tail; }
     virtual ~AstExpressionList() { delete list; }
-    void append(AstExpression *expr) { assert(tail != NULL); tail->next = new AstExpressionListItem(expr); tail = tail->next; }
+    void append(AstExpression *expr, const Token op=TOKEN_UNKNOWN) { assert(tail != NULL); tail->next = new AstExpressionListItem(expr, op); tail = tail->next; }
     virtual void accept(AstVisitor *visitor) { visitor->visit(this); }
     AstExpressionListItem *list;
     AstExpressionListItem *tail;
@@ -363,17 +375,35 @@ struct AstExpressionList : public AstNode
 
 struct AstFunctionCallExpression : public AstExpression
 {
-    AstFunctionCallExpression(const SourcePosition &pos, const char *_name, AstExpressionList *exprs) : AstExpression(pos), identifier(_name), expressions(exprs) {}
-    virtual ~AstFunctionCallExpression() { delete expressions; }
+    AstFunctionCallExpression(const SourcePosition &pos, AstExpression *_fn, AstExpressionList *_args) : AstExpression(pos), fn(_fn), args(_args) {}
+    virtual ~AstFunctionCallExpression() { delete args; }
     virtual void accept(AstVisitor *visitor) { visitor->visit(this); }
-    const char *identifier;  // not a copy, don't delete.
-    AstExpressionList *expressions;
+    AstExpression *fn;
+    AstExpressionList *args;
+};
+
+struct AstStructDereferenceExpression : public AstExpression
+{
+    AstStructDereferenceExpression(const SourcePosition &pos, AstExpression *_parent, const char *_field) : AstExpression(pos), parent(_parent), field(_field) {}
+    virtual ~AstStructDereferenceExpression() { delete parent; }
+    virtual void accept(AstVisitor *visitor) { visitor->visit(this); }
+    AstExpression *parent;
+    const char *field;
 };
 
 struct AstExitStatement : public AstStatement
 {
     AstExitStatement(const SourcePosition &pos) : AstStatement(pos) {}
     virtual void accept(AstVisitor *visitor) { visitor->visit(this); }
+};
+
+struct AstSubCallStatement : public AstStatement
+{
+    AstSubCallStatement(const SourcePosition &pos, const char *_identifier, AstExpressionList *_args) : AstStatement(pos), identifier(_identifier), args(_args) {}
+    virtual ~AstSubCallStatement() { delete args; }
+    virtual void accept(AstVisitor *visitor) { visitor->visit(this); }
+    const char *identifier;
+    AstExpressionList *args;
 };
 
 struct AstAssignmentStatement : public AstStatement
@@ -406,11 +436,13 @@ struct AstWhileStatement : public AstStatement
 
 struct AstDoStatement : public AstStatement
 {
-    AstDoStatement(const SourcePosition &pos, AstStatementBlock *_block, AstExpression *_expr) : AstStatement(pos), expr(_expr), block(_block) {}
+    AstDoStatement(const SourcePosition &pos, const bool _bIsConditionalAtStart, const bool _bIsWhile, AstStatementBlock *_block, AstExpression *_expr) : AstStatement(pos), expr(_expr), block(_block), bIsConditionalAtStart(_bIsConditionalAtStart), bIsWhile(_bIsWhile) {}
     virtual ~AstDoStatement() { delete expr; delete block; }
     virtual void accept(AstVisitor *visitor) { visitor->visit(this); }
     AstExpression *expr;
     AstStatementBlock *block;
+    const bool bIsConditionalAtStart;
+    const bool bIsWhile;
 };
 
 struct AstForStatement : public AstStatement
@@ -425,6 +457,25 @@ struct AstForStatement : public AstStatement
     AstStatementBlock *block;
 };
 
+struct AstCase : public AstNode
+{
+    AstCase(const SourcePosition &pos, AstExpressionList *_cases, AstStatementBlock *_block) : AstNode(pos), cases(_cases), block(_block), next(NULL) {}
+    virtual ~AstCase() { delete cases; delete block; delete next; }
+    virtual void accept(AstVisitor *visitor) { visitor->visit(this); }
+    AstExpressionList *cases;
+    AstStatementBlock *block;
+    AstCase *next;
+};
+
+struct AstSelectStatement : public AstStatement
+{
+    AstSelectStatement(const SourcePosition &pos, AstExpression *_test, AstCase *_cases) : AstStatement(pos), test(_test), cases(_cases) {}
+    virtual ~AstSelectStatement() { delete test; }
+    virtual void accept(AstVisitor *visitor) { visitor->visit(this); }
+    AstExpression *test;
+    AstCase *cases;
+};
+
 struct AstConstStatement : public AstStatement
 {
     AstConstStatement(const SourcePosition &pos, const char *_identifier, AstExpression *_initializer) : AstStatement(pos), identifier(_identifier), initializer(_initializer) {}
@@ -434,7 +485,12 @@ struct AstConstStatement : public AstStatement
     AstExpression *initializer;
 };
 
-
+struct AstLineLabel : public AstStatement
+{
+    AstLineLabel(const SourcePosition &pos, const char *_identifier) : AstStatement(pos), identifier(_identifier) {}
+    virtual void accept(AstVisitor *visitor) { visitor->visit(this); }
+    const char *identifier;
+};
 
 struct AstProgram : public AstNode
 {
