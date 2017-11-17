@@ -232,6 +232,9 @@ static void MOJOBASIC_print_debug_token(const char *subsystem, const char *token
         TOKENCASE(TOKEN_LOCK);
         TOKENCASE(TOKEN_ACCESS);
         TOKENCASE(TOKEN_DEF);
+        TOKENCASE(TOKEN_GET);
+        TOKENCASE(TOKEN_PUT);
+        TOKENCASE(TOKEN_STEP);
         #undef TOKENCASE
 
         default:

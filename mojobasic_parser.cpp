@@ -104,6 +104,7 @@ private:
     AstSubCallStatement *parseView();
     AstSubCallStatement *parseInput();
     AstSubCallStatement *parseLine();
+    AstSubCallStatement *parseGetOrPut(const bool bIsGet);
     AstIfStatement *parseIf();
     AstStatement *parseDo();
     AstStatement *parseEnd();
@@ -264,6 +265,9 @@ void Parser::convertToParserToken(TokenData &data)
         TOKENCMP(LOCK);
         TOKENCMP(ACCESS);
         TOKENCMP(DEF);
+        TOKENCMP(GET);
+        TOKENCMP(PUT);
+        TOKENCMP(STEP);
         #undef TOKENCMP
     } // if
 } // Parser::convertToParserToken
@@ -431,8 +435,8 @@ AstStatement *Parser::parseStatement() {
     else if (want(TOKEN_PRINT) || want(TOKEN_QUESTION)) return parsePrint();
     else if (want(TOKEN_OPEN)) return parseOpen();
     else if (want(TOKEN_CLOSE)) return parseClose();
-    //else if (want(TOKEN_GET)) return parseGet();
-    //else if (want(TOKEN_PUT)) return parsePut();
+    else if (want(TOKEN_GET)) return parseGetOrPut(true);
+    else if (want(TOKEN_PUT)) return parseGetOrPut(false);
     //else if (want(TOKEN_LINE)) return parseLine();
     else if (want(TOKEN_VIEW)) return parseView();
     else if (want(TOKEN_LINE)) return parseLine();
@@ -1049,6 +1053,45 @@ AstSubCallStatement *Parser::parseClose()
     }
     return new AstSubCallStatement(position, "CLOSE", args);
 } // Parser::parseClose
+
+AstSubCallStatement *Parser::parseGetOrPut(const bool bIsGet)
+{
+    const SourcePosition position(previousToken.position);
+
+    want(TOKEN_HASH);  // optional
+
+    int numargs = 1;
+    AstExpression *filenum = parseExpression();
+    AstExpression *recnum = NULL;
+    AstExpression *lvalue = NULL;
+
+    if (!filenum) {
+        fail("Expected file number expression");
+        filenum = new AstIntLiteralExpression(position, 1);
+    }
+
+    if (want(TOKEN_COMMA))
+    {
+        numargs++;
+        recnum = parseExpression();
+        if (!recnum) {
+            fail("Expected expression");
+        }
+
+        if (want(TOKEN_COMMA)) {
+            numargs++;
+            // !!! FIXME: we should have a parseLValue for this?
+            const char *ident = need(TOKEN_IDENTIFIER, "Expected variable") ? previousToken.string : "x";
+            lvalue = parseIdentifierExpression(new AstIdentifierExpression(previousToken.position, ident));
+        }
+    }
+
+    AstExpressionList *args = new AstExpressionList(position, new AstIntLiteralExpression(position, numargs));
+    if (filenum) args->append(filenum);
+    if (recnum) args->append(recnum);
+    if (lvalue) args->append(lvalue);
+    return new AstSubCallStatement(position, bIsGet ? "GET" : "PUT", args);
+} // Parser::parseGetOrPut
 
 AstSubCallStatement *Parser::parsePrint()
 {
