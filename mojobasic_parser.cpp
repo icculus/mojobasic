@@ -102,6 +102,8 @@ private:
     AstSubCallStatement *parseClose();
     AstSubCallStatement *parsePrint();
     AstSubCallStatement *parseView();
+    AstSubCallStatement *parseInput();
+    AstSubCallStatement *parseLine();
     AstIfStatement *parseIf();
     AstStatement *parseDo();
     AstStatement *parseEnd();
@@ -433,6 +435,8 @@ AstStatement *Parser::parseStatement() {
     //else if (want(TOKEN_PUT)) return parsePut();
     //else if (want(TOKEN_LINE)) return parseLine();
     else if (want(TOKEN_VIEW)) return parseView();
+    else if (want(TOKEN_LINE)) return parseLine();
+    else if (want(TOKEN_INPUT)) return parseInput();
     else if (want(TOKEN_IDENTIFIER)) return parseIdentifierStatement();
 
     // numeric labels have to be at the start of the line, a ':' separator won't do.
@@ -1024,16 +1028,19 @@ AstSubCallStatement *Parser::parseClose()
 {
     std::vector<AstExpression*> fileids;
     const SourcePosition position(previousToken.position);
-
-    do {
-        want(TOKEN_HASH);  // optional '#' before file id.
-        AstExpression *expr = parseExpression();
-        if (!expr) {
-            fail("Expected file number expression");
-        } else {
-            fileids.push_back(expr);
-        }
-    } while (want(TOKEN_COMMA));
+    if (wantEndOfStatement()) {
+        pushback();
+    } else {
+        do {
+            want(TOKEN_HASH);  // optional '#' before file id.
+            AstExpression *expr = parseExpression();
+            if (!expr) {
+                fail("Expected file number expression");
+            } else {
+                fileids.push_back(expr);
+            }
+        } while (want(TOKEN_COMMA));
+    }
 
     AstIntLiteralExpression *numids = new AstIntLiteralExpression(position, fileids.size());
     AstExpressionList *args = new AstExpressionList(position, numids);
@@ -1088,6 +1095,60 @@ AstSubCallStatement *Parser::parseView()
     fail("only VIEW PRINT is currently supported");
     return NULL;
 } // Parser::parseView
+
+AstSubCallStatement *Parser::parseInput()
+{
+    const SourcePosition position(previousToken.position);
+
+    if (want(TOKEN_HASH)) {  // file i/o
+        AstExpression *filenum = parseExpression();
+        if (!filenum) {
+            fail("Expected expression");
+            filenum = new AstIntLiteralExpression(previousToken.position, 1);
+        }
+        AstExpressionList *args = new AstExpressionList(previousToken.position, filenum);
+        need(TOKEN_COMMA, "Expected ','");
+        // !!! FIXME: we should have a parseLValue for this?
+        const char *ident = need(TOKEN_IDENTIFIER, "Expected variable") ? previousToken.string : "x";
+        AstExpression *lvalue = parseIdentifierExpression(new AstIdentifierExpression(previousToken.position, ident));
+        args->append(lvalue);
+        return new AstSubCallStatement(position, "INPUT_FILE", args);
+    }
+
+    // keyboard i/o
+    const bool bStayOnLine = want(TOKEN_SEMICOLON);
+    AstExpressionList *args = new AstExpressionList(previousToken.position, new AstIntLiteralExpression(position, bStayOnLine ? 1 : 0));
+
+    const char *prompt = need(TOKEN_STRING_LITERAL, "Expected string literal (not expression!)") ? previousToken.string : "";
+    args->append(new AstStringLiteralExpression(previousToken.position, prompt));
+
+    bool bAddQuestionMark = false;
+    if (want(TOKEN_SEMICOLON)) {
+        bAddQuestionMark = true;
+    } else {
+        need(TOKEN_COMMA, "Expected ';' or ','");
+    }
+    args->append(new AstIntLiteralExpression(previousToken.position, bAddQuestionMark ? 1 : 0));
+
+    // !!! FIXME: we should have a parseLValue for this?
+    const char *ident = need(TOKEN_IDENTIFIER, "Expected variable") ? previousToken.string : "x";
+    AstExpression *lvalue = parseIdentifierExpression(new AstIdentifierExpression(previousToken.position, ident));
+    args->append(lvalue);
+
+    return new AstSubCallStatement(position, "INPUT_KEY", args);
+} // Parser::parseInput
+
+AstSubCallStatement *Parser::parseLine()
+{
+    const SourcePosition position(previousToken.position);
+    if (want(TOKEN_INPUT)) {
+        return parseInput();
+    }
+
+    // !!! FIXME:
+    fail("only LINE INPUT is currently supported");
+    return NULL;
+} // Parser::parseLine
 
 AstExitStatement *Parser::parseExit() {
     const SourcePosition position(previousToken.position);
