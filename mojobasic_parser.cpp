@@ -13,7 +13,7 @@ struct StatementCollector
 {
     StatementCollector(const SourcePosition &pos) : start(pos), tail(&start) {}
     virtual ~StatementCollector() { start.next = NULL; }
-    AstStatementBlock *newStatementBlock() { return new AstStatementBlock(start.position, start.next); start.next = NULL; tail = &start; }
+    AstStatementBlock *newStatementBlock() { AstStatementBlock *retval = new AstStatementBlock(start.position, start.next); start.next = NULL; tail = &start; return retval; }
     AstExitStatement start;  // just picked a simple not-pure-virtual class.
     AstStatement *tail;
 };
