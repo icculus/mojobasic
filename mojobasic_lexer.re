@@ -109,6 +109,7 @@ scanner_loop:
     ":"             { RET(TOKEN_COLON); }
     "="             { RET(TOKEN_ASSIGN); }
     ";"             { RET(TOKEN_SEMICOLON); }
+    "?"             { RET(TOKEN_QUESTION); }
 
     "\000"          { if (eoi) { RET(TOKEN_EOI); } goto bad_chars; }
 

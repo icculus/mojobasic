@@ -155,6 +155,7 @@ static void MOJOBASIC_print_debug_token(const char *subsystem, const char *token
         TOKENCASE(TOKEN_COLON);
         TOKENCASE(TOKEN_ASSIGN);
         TOKENCASE(TOKEN_SEMICOLON);
+        TOKENCASE(TOKEN_QUESTION);
         TOKENCASE(TOKEN_NEWLINE);
         TOKENCASE(TOKEN_WHITESPACE);
         TOKENCASE(TOKEN_UNKNOWN);

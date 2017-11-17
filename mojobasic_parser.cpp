@@ -387,7 +387,7 @@ AstStatement *Parser::parseStatement() {
     else if (want(TOKEN_DO)) return parseDo();
     //else if (want(TOKEN_WHILE)) return parseWhile();
     else if (want(TOKEN_SELECT)) return parseSelect();
-    //else if (want(TOKEN_PRINT)) return parsePrint();
+    //else if (want(TOKEN_PRINT) || want(TOKEN_QUESTION)) return parsePrint();
     //else if (want(TOKEN_EXIT)) return parseExit();
     else if (want(TOKEN_END)) return parseEnd();
 
