@@ -395,8 +395,9 @@ struct AstStructDereferenceExpression : public AstExpression
 
 struct AstExitStatement : public AstStatement
 {
-    AstExitStatement(const SourcePosition &pos) : AstStatement(pos) {}
+    AstExitStatement(const SourcePosition &pos, const Token _type) : AstStatement(pos), type(_type) {}
     virtual void accept(AstVisitor *visitor) { visitor->visit(this); }
+    const Token type;
 };
 
 struct AstSubCallStatement : public AstStatement

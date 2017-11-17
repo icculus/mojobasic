@@ -278,7 +278,16 @@ public:
     }
 
     virtual void visit(AstExitStatement *node) {
-        printf("EXIT [something];\n");  // !!! FIXME
+        printf("EXIT ");
+        switch (node->type) {
+            case TOKEN_DEF: printf("DEF"); break;
+            case TOKEN_DO: printf("DO"); break;
+            case TOKEN_FOR: printf("FOR"); break;
+            case TOKEN_FUNCTION: printf("FUNCTION"); break;
+            case TOKEN_SUB: printf("SUB"); break;
+            default: assert(!"unexpected EXIT type"); printf("[ ? ? ? ]"); break;
+        }
+        printf("\n");
     }
 
     virtual void visit(AstAssignmentStatement *node) {

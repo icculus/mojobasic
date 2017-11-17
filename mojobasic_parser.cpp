@@ -11,7 +11,7 @@
 
 struct StatementCollector
 {
-    StatementCollector(const SourcePosition &pos) : start(pos), tail(&start) {}
+    StatementCollector(const SourcePosition &pos) : start(pos, TOKEN_UNKNOWN), tail(&start) {}
     virtual ~StatementCollector() { start.next = NULL; }
     AstStatementBlock *newStatementBlock() { AstStatementBlock *retval = new AstStatementBlock(start.position, start.next); start.next = NULL; tail = &start; return retval; }
     AstExitStatement start;  // just picked a simple not-pure-virtual class.
@@ -102,6 +102,7 @@ private:
     AstIfStatement *parseIf();
     AstStatement *parseDo();
     AstStatement *parseEnd();
+    AstExitStatement *parseExit();
     AstSelectStatement *parseSelect();
     AstExpression *parseExpression(const int precedence=0);
     AstExpression *parseSubExpression();
@@ -257,6 +258,7 @@ void Parser::convertToParserToken(TokenData &data)
         TOKENCMP(WRITE);
         TOKENCMP(LOCK);
         TOKENCMP(ACCESS);
+        TOKENCMP(DEF);
         #undef TOKENCMP
     } // if
 } // Parser::convertToParserToken
@@ -410,7 +412,7 @@ AstStatement *Parser::parseStatement() {
     //else if (want(TOKEN_WHILE)) return parseWhile();
     else if (want(TOKEN_SELECT)) return parseSelect();
     //else if (want(TOKEN_PRINT) || want(TOKEN_QUESTION)) return parsePrint();
-    //else if (want(TOKEN_EXIT)) return parseExit();
+    else if (want(TOKEN_EXIT)) return parseExit();
     else if (want(TOKEN_END)) return parseEnd();
 
         // these are just function calls into the standard runtime, but they
@@ -1030,6 +1032,17 @@ AstSubCallStatement *Parser::parseClose()
     }
     return new AstSubCallStatement(position, "CLOSE", args);
 } // Parser::parseClose
+
+AstExitStatement *Parser::parseExit() {
+    const SourcePosition position(previousToken.position);
+    Token type = TOKEN_FUNCTION;
+    if (want(TOKEN_DEF) || want(TOKEN_DO) || want(TOKEN_FOR) || want(TOKEN_FUNCTION) || want(TOKEN_SUB)) {
+        type = previousToken.tokenval;
+    } else {
+        fail("Expected DEF, DO, FOR, FUNCTION, or SUB");
+    }
+    return new AstExitStatement(position, type);
+} // Parser::parseExit
 
 AstStatement *Parser::parseEnd() {
     const SourcePosition position(previousToken.position);
