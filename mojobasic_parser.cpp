@@ -71,6 +71,7 @@ private:
     bool need(const Token t, const char *err);
     void dumpUntilEndOfStatement(); // dump tokens until we hit something that looks like the end of a statement.
     void dumpUntilEndOfLine(); // dump tokens until we hit eol.
+    bool wantEndOfStatement();
     bool needEndOfStatement();
     AstStatement *failAndDumpStatement(const char *err);  // always returns NULL
     bool needEndOfLine();
@@ -99,6 +100,8 @@ private:
     AstStatement *parseOn();
     AstSubCallStatement *parseOpen();
     AstSubCallStatement *parseClose();
+    AstSubCallStatement *parsePrint();
+    AstSubCallStatement *parseView();
     AstIfStatement *parseIf();
     AstStatement *parseDo();
     AstStatement *parseEnd();
@@ -379,6 +382,13 @@ bool Parser::needEndOfStatement() {
     failAndDumpStatement("Expected end of statement"); return false;
 } // Parser::needEndOfStatement
 
+bool Parser::wantEndOfStatement() {
+    // numeric labels just carry on to the line's actual statement.
+    if (bWasNumericLabel) { bWasNumericLabel = false; return true; }
+    if (want(TOKEN_NEWLINE) || want(TOKEN_COLON) || want(TOKEN_EOI)) return true;
+    return false;
+} // Parser::wantEndOfStatement
+
 bool Parser::needEndOfLine() {
     if (want(TOKEN_NEWLINE) || want(TOKEN_EOI)) return true;
     failAndDumpStatement("Expected end of line"); return false;
@@ -411,18 +421,18 @@ AstStatement *Parser::parseStatement() {
     else if (want(TOKEN_DO)) return parseDo();
     //else if (want(TOKEN_WHILE)) return parseWhile();
     else if (want(TOKEN_SELECT)) return parseSelect();
-    //else if (want(TOKEN_PRINT) || want(TOKEN_QUESTION)) return parsePrint();
     else if (want(TOKEN_EXIT)) return parseExit();
     else if (want(TOKEN_END)) return parseEnd();
 
         // these are just function calls into the standard runtime, but they
         //  have magic syntactic sugar in BASIC...
+    else if (want(TOKEN_PRINT) || want(TOKEN_QUESTION)) return parsePrint();
     else if (want(TOKEN_OPEN)) return parseOpen();
     else if (want(TOKEN_CLOSE)) return parseClose();
     //else if (want(TOKEN_GET)) return parseGet();
     //else if (want(TOKEN_PUT)) return parsePut();
     //else if (want(TOKEN_LINE)) return parseLine();
-    //else if (want(TOKEN_VIEW)) return parseView();
+    else if (want(TOKEN_VIEW)) return parseView();
     else if (want(TOKEN_IDENTIFIER)) return parseIdentifierStatement();
 
     // numeric labels have to be at the start of the line, a ':' separator won't do.
@@ -1032,6 +1042,52 @@ AstSubCallStatement *Parser::parseClose()
     }
     return new AstSubCallStatement(position, "CLOSE", args);
 } // Parser::parseClose
+
+AstSubCallStatement *Parser::parsePrint()
+{
+    const SourcePosition position(previousToken.position);
+
+    // !!! FIXME: actually write me. This one is nasty.
+    dumpUntilEndOfStatement(); pushback();
+    return new AstSubCallStatement(position, "PRINT", NULL);
+} // Parser::parsePrint()
+
+AstSubCallStatement *Parser::parseView()
+{
+    const SourcePosition position(previousToken.position);
+    bool bHasRange = false;
+    if (want(TOKEN_PRINT)) {  // VIEW PRINT
+        if (wantEndOfStatement()) { // no range specified.
+            pushback();
+        } else {
+            bHasRange = true;
+        }
+
+        AstIntLiteralExpression *hasrange = new AstIntLiteralExpression(position, bHasRange ? 1 : 0);
+        AstExpressionList *args = new AstExpressionList(position, hasrange);
+        if (bHasRange) {
+            AstExpression *lower = parseExpression();
+            if (!lower) {
+                fail("Expected expression");
+                lower = new AstIntLiteralExpression(position, 0);
+            }
+            args->append(lower);
+            need(TOKEN_TO, "Expected TO");
+            AstExpression *upper = parseExpression();
+            if (!upper) {
+                fail("Expected expression");
+                upper = new AstIntLiteralExpression(position, 0);
+            }
+            args->append(upper);
+        }
+
+        return new AstSubCallStatement(position, "VIEW_PRINT", args);
+    }
+
+    // !!! FIXME:
+    fail("only VIEW PRINT is currently supported");
+    return NULL;
+} // Parser::parseView
 
 AstExitStatement *Parser::parseExit() {
     const SourcePosition position(previousToken.position);
