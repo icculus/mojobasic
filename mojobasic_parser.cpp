@@ -106,6 +106,7 @@ private:
     AstSubCallStatement *parseLine();
     AstSubCallStatement *parseGetOrPut(const bool bIsGet);
     AstIfStatement *parseIf();
+    AstForStatement *parseFor();
     AstStatement *parseDo();
     AstStatement *parseEnd();
     AstExitStatement *parseExit();
@@ -423,7 +424,7 @@ AstStatement *Parser::parseStatement() {
     else if (want(TOKEN_ON)) return parseOn();
     //else if (want(TOKEN_REDIM)) return parseReDim();
     else if (want(TOKEN_IF)) return parseIf();
-    //else if (want(TOKEN_FOR)) return parseFor();
+    else if (want(TOKEN_FOR)) return parseFor();
     else if (want(TOKEN_DO)) return parseDo();
     //else if (want(TOKEN_WHILE)) return parseWhile();
     else if (want(TOKEN_SELECT)) return parseSelect();
@@ -773,6 +774,59 @@ AstStatement *Parser::parseOn() {
     // (etc) if (want(TOKEN_PEN)) return parseOnPen();
     return failAndDumpStatement("Syntax error");  // !!! FIXME: "expected ERROR,etc"?
 } // Parser::parseOn
+
+AstForStatement *Parser::parseFor()
+{
+    const SourcePosition position(previousToken.position);
+    // !!! FIXME: we should have a parseLValue for this?
+    const char *counter = need(TOKEN_IDENTIFIER, "Expected variable") ? previousToken.string : "x";
+    if (!counter) {
+        fail("Expected variable");
+    }
+
+    need(TOKEN_ASSIGN, "Expected '='");
+
+    AstExpression *lower = parseExpression();
+    if (!lower) {
+        fail("Expected expression");
+        lower = new AstIntLiteralExpression(position, 1);
+    }
+
+    need(TOKEN_TO, "Expected TO");
+
+    AstExpression *upper = parseExpression();
+    if (!upper) {
+        fail("Expected expression");
+        upper = new AstIntLiteralExpression(position, 1);
+    }
+
+    AstExpression *step = NULL;
+    if (want(TOKEN_STEP)) {
+        step = parseExpression();
+        if (!step) {
+            fail("Expected expression");
+        }
+    }
+
+    needEndOfStatement();
+
+    StatementCollector collector(currentToken.position);
+    while (true) {
+        if (!parseStatements(collector)) {
+            if (want(TOKEN_NEXT)) {
+                wantIdentifier(counter);  // just drop this if it's here.
+                break;
+            } else if (want(TOKEN_EOI)) {
+                fail("Expected NEXT");
+                break;
+            } else {
+                failAndDumpStatement("Syntax error");
+            }
+        }
+    }
+
+    return new AstForStatement(position, counter, lower, upper, step, collector.newStatementBlock());
+} // Parser::parseFor
 
 AstStatement *Parser::parseDo() {
     const SourcePosition position(previousToken.position);
