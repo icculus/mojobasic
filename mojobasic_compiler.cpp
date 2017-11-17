@@ -452,6 +452,11 @@ public:
         printf("\n");
     }
 
+    virtual void visit(AstOnErrorStatement *node) {
+        printf("ON %sERROR %s%s\n", node->bIsLocal ? "LOCAL " : "", node->label ? "GOTO " : "RESUME NEXT", node->label ? node->label : "");
+    }
+
+
 #if 0
     static void printDataType(const AstDataType dt)
     {

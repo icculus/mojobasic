@@ -242,6 +242,9 @@ void Parser::convertToParserToken(TokenData &data)
         TOKENCMP(LOOP);
         TOKENCMP(CASE);
         TOKENCMP(IS);
+        TOKENCMP(RESUME);
+        TOKENCMP(NEXT);
+        TOKENCMP(GOTO);
         #undef TOKENCMP
     } // if
 } // Parser::convertToParserToken
@@ -700,8 +703,22 @@ AstDefStatement *Parser::parseDefType(const char *typ) {
 } // Parser::parseDefType
 
 AstStatement *Parser::parseOnError(const bool bLocal) {
-    return failAndDumpStatement("write me (parseOnError)");
-}
+    const SourcePosition position(previousToken.position);
+    const char *label = NULL;
+    if (want(TOKEN_RESUME)) {
+        need(TOKEN_NEXT, "Expected NEXT");
+    } else if (want(TOKEN_GOTO)) {
+        if (want(TOKEN_STRING_LITERAL)) {
+            label = previousToken.string;
+        } else if (want(TOKEN_INT_LITERAL) || want(TOKEN_FLOAT_LITERAL)) {
+            label = strcache.cache(previousToken.token, previousToken.tokenlen);
+        }
+    } else {
+        fail("Expected GOTO or RESUME");
+    }
+
+    return new AstOnErrorStatement(position, bLocal, label);
+} // Parser::parseOnError
 
 AstStatement *Parser::parseOn() {
     const bool bLocal = want(TOKEN_LOCAL);
@@ -1051,7 +1068,6 @@ AstExpression *Parser::parseSubExpression() {
         return parseIdentifierExpression(new AstIdentifierExpression(position, previousToken.string));
     }
 
-    fail("Expected expression");
     return NULL;
 } // Parser::parseSubExpression
 

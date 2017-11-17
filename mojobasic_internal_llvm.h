@@ -98,6 +98,7 @@ struct AstVariableDeclarationStatement;
 struct AstTypeDeclarationStatement;
 struct AstDefStatement;
 struct AstLineLabel;
+struct AstOnErrorStatement;
 
 class AstVisitor
 {
@@ -149,6 +150,7 @@ public:
     virtual void visit(AstVariableDeclarationStatement *node) = 0;
     virtual void visit(AstTypeDeclarationStatement *node) = 0;
     virtual void visit(AstDefStatement *node) = 0;
+    virtual void visit(AstOnErrorStatement *node) = 0;
     virtual void visit(AstLineLabel *node) = 0;
 };
 
@@ -491,6 +493,16 @@ struct AstLineLabel : public AstStatement
     virtual void accept(AstVisitor *visitor) { visitor->visit(this); }
     const char *identifier;
 };
+
+struct AstOnErrorStatement : public AstStatement
+{
+    AstOnErrorStatement(const SourcePosition &pos, const bool _bIsLocal, const char *_label) : AstStatement(pos), bIsLocal(_bIsLocal), label(_label) {}
+    virtual ~AstOnErrorStatement() {}
+    virtual void accept(AstVisitor *visitor) { visitor->visit(this); }
+    const bool bIsLocal;
+    const char *label;
+};
+
 
 struct AstProgram : public AstNode
 {

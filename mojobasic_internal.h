@@ -492,7 +492,10 @@ enum Token
     TOKEN_UNTIL,
     TOKEN_LOOP,
     TOKEN_CASE,
-    TOKEN_IS
+    TOKEN_IS,
+    TOKEN_RESUME,
+    TOKEN_NEXT,
+    TOKEN_GOTO
 };
 
 
