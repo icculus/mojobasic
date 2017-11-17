@@ -90,7 +90,7 @@ scanner_loop:
     L (L|D)* SUFFIX?       { RET(TOKEN_IDENTIFIER); }
     ("&H" H+) | ("&O" O+) | (D+)  { RET(TOKEN_INT_LITERAL); }
     (D+ E) | (D* "." D+ E?) | (D+ "." D* E?) { RET(TOKEN_FLOAT_LITERAL); }
-    (["] (ANY\[\r\n\\"])* ["]) { RET(TOKEN_STRING_LITERAL); }
+    (["] (ANY\[\r\n"])* ["]) { RET(TOKEN_STRING_LITERAL); }
     "<="            { RET(TOKEN_LEQ); }
     ">="            { RET(TOKEN_GEQ); }
     "<>"            { RET(TOKEN_NEQ); }
