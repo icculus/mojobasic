@@ -367,9 +367,10 @@ public:
             printf(" STEP ");
             node->step->accept(this);
         }
+        printf("\n");
         node->block->accept(this);
         printIndent();
-        printf("END FOR\n");
+        printf("NEXT\n");
     }
 
     virtual void visit(AstCase *node) {
