@@ -506,8 +506,7 @@ enum Token
     TOKEN_READ,
     TOKEN_WRITE,
     TOKEN_LOCK,
-    TOKEN_ACCESS,
-    TOKEN_LEN
+    TOKEN_ACCESS
 };
 
 

@@ -107,6 +107,7 @@ private:
     AstExpression *parseSubExpression();
     Token wantBinaryOperator();
     Token wantUnaryOperator();
+    bool wantIdentifier(const char *ident);
 
     void *ctx;
     StringCache &strcache;
@@ -256,7 +257,6 @@ void Parser::convertToParserToken(TokenData &data)
         TOKENCMP(WRITE);
         TOKENCMP(LOCK);
         TOKENCMP(ACCESS);
-        TOKENCMP(LEN);
         #undef TOKENCMP
     } // if
 } // Parser::convertToParserToken
@@ -339,6 +339,16 @@ bool Parser::need(const Token t, const char *err) {
     failAndDumpStatement(err);
     return false;
 } // Parser::need
+
+bool Parser::wantIdentifier(const char *ident) {
+    if (currentToken.tokenval == TOKEN_IDENTIFIER) {
+        if (strcmp(currentToken.string, ident) == 0) {
+            getNextToken();
+            return true;
+        }
+    }
+    return false;
+} // Parser::wantIdentifier
 
 AstStatement *Parser::failAndDumpStatement(const char *err) {
     fail(err);
@@ -987,7 +997,7 @@ AstSubCallStatement *Parser::parseOpen()
 
     const SourcePosition reclen_position(currentToken.position);
     AstExpression *reclen = NULL;
-    if (want(TOKEN_LEN)) {
+    if (wantIdentifier("LEN")) {  // !!! FIXME: it's messy to make this an actual keyword, but incorrect to not do so.
         need(TOKEN_ASSIGN, "Expected '='");
         reclen = parseExpression();
     }
