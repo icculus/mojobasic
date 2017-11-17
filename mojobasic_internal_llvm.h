@@ -43,7 +43,7 @@ typedef uint64 AstDataType;  // !!! FIXME
 
 struct MOJOBASIC_program
 {
-    MOJOBASIC_program() : module(NULL) {}
+    MOJOBASIC_program() : name(NULL), module(NULL) {}
     ~MOJOBASIC_program();
     const char *name;
     std::vector<MOJOBASIC_error> errors;
