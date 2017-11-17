@@ -881,6 +881,8 @@ AstSelectStatement *Parser::parseSelect()
     AstExpression *test = parseExpression();
     needEndOfStatement();
 
+    while (want(TOKEN_NEWLINE)) { /* spin */ }
+
     CaseCollector casecollector(position);
     bool bSawElse = false;
     while (want(TOKEN_CASE)) {
