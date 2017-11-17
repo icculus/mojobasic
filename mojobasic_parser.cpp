@@ -530,7 +530,7 @@ AstStatement *Parser::parseIdentifierStatement()
     //  correct AST here until then.
 
     const Token t = currentToken.tokenval;
-    if ((t != TOKEN_ASSIGN) && (t != TOKEN_COLON) && (t != TOKEN_LPAREN)) {
+    if ((t != TOKEN_ASSIGN) && (t != TOKEN_COLON) && (t != TOKEN_LPAREN) && (t != TOKEN_DOT)) {
         // sub call or syntax error
         AstExpressionList *args = parseFunctionArgs();
         return new AstSubCallStatement(position, identifier, args);
