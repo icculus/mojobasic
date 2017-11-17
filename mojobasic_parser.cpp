@@ -97,6 +97,8 @@ private:
     AstDefStatement *parseDefStr() { return parseDefType("STR"); }
     AstStatement *parseOnError(const bool bLocal);
     AstStatement *parseOn();
+    AstSubCallStatement *parseOpen();
+    AstSubCallStatement *parseClose();
     AstIfStatement *parseIf();
     AstStatement *parseDo();
     AstStatement *parseEnd();
@@ -245,6 +247,16 @@ void Parser::convertToParserToken(TokenData &data)
         TOKENCMP(RESUME);
         TOKENCMP(NEXT);
         TOKENCMP(GOTO);
+        TOKENCMP(RANDOM);
+        TOKENCMP(BINARY);
+        TOKENCMP(INPUT);
+        TOKENCMP(OUTPUT);
+        TOKENCMP(APPEND);
+        TOKENCMP(READ);
+        TOKENCMP(WRITE);
+        TOKENCMP(LOCK);
+        TOKENCMP(ACCESS);
+        TOKENCMP(LEN);
         #undef TOKENCMP
     } // if
 } // Parser::convertToParserToken
@@ -393,8 +405,10 @@ AstStatement *Parser::parseStatement() {
 
         // these are just function calls into the standard runtime, but they
         //  have magic syntactic sugar in BASIC...
-    //else if (want(TOKEN_OPEN)) return parseOpen();
-    //else if (want(TOKEN_CLOSE)) return parseClose();
+    else if (want(TOKEN_OPEN)) return parseOpen();
+    else if (want(TOKEN_CLOSE)) return parseClose();
+    //else if (want(TOKEN_GET)) return parseGet();
+    //else if (want(TOKEN_PUT)) return parsePut();
     //else if (want(TOKEN_LINE)) return parseLine();
     //else if (want(TOKEN_VIEW)) return parseView();
     else if (want(TOKEN_IDENTIFIER)) return parseIdentifierStatement();
@@ -412,7 +426,10 @@ bool Parser::parseStatements(StatementCollector &collector) {
     if (stmt) {
         needEndOfStatement();
         collector.tail->next = stmt;
-        collector.tail = stmt;
+        // iterate so tail is the last of any chained statements.
+        for (collector.tail = stmt, stmt = stmt->next; stmt; stmt = stmt->next) {
+            collector.tail = stmt;
+        }
         return true;
     }
     return false;
@@ -910,6 +927,99 @@ AstIfStatement *Parser::parseIf() {
     return new AstIfStatement(position, expr, statements, else_statements);
 } // Parser::parseIf
 
+AstSubCallStatement *Parser::parseOpen()
+{
+    const SourcePosition position(previousToken.position);
+    AstExpression *fname = parseExpression();
+    if (!fname) {
+        fname = new AstStringLiteralExpression(position, "x");
+    }
+    AstExpressionList *args = new AstExpressionList(position, fname);
+
+    const SourcePosition for_position(currentToken.position);
+    Token openFor = TOKEN_RANDOM;
+    if (want(TOKEN_FOR)) {
+        // !!! FIXME: FOR ISAM
+        if (want(TOKEN_RANDOM) || want(TOKEN_BINARY) || want(TOKEN_INPUT) || want(TOKEN_OUTPUT) || want(TOKEN_APPEND)) {
+            openFor = previousToken.tokenval;
+        } else {
+            fail("Expected RANDOM, BINARY, INPUT, OUTPUT, or APPEND");
+        }
+    }
+    args->append(new AstIntLiteralExpression(for_position, (int64) (openFor - TOKEN_RANDOM)));
+
+    const SourcePosition access_position(currentToken.position);
+    int openAccess = 1;
+    if (want(TOKEN_ACCESS)) {
+        openAccess = 0;
+        if (want(TOKEN_READ)) {
+            openAccess |= 1;
+        }
+        if (want(TOKEN_WRITE)) {
+            openAccess |= 2;
+        }
+    }
+    args->append(new AstIntLiteralExpression(access_position, openAccess));
+
+    const SourcePosition lock_position(currentToken.position);
+    int openLock = 0;
+    if (want(TOKEN_SHARED)) {
+        openLock = 0;
+    } else if (want(TOKEN_LOCK)) {
+        if (want(TOKEN_READ)) {
+            openLock |= 1;
+        }
+        if (want(TOKEN_WRITE)) {
+            openLock |= 2;
+        }
+    }
+    args->append(new AstIntLiteralExpression(lock_position, openLock));
+
+    need(TOKEN_AS, "Expected AS");
+    want(TOKEN_HASH);  // optional '#' before file number.
+
+    const SourcePosition filenum_position(currentToken.position);
+    AstExpression *filenum = parseExpression();
+    if (!filenum) {
+        filenum = new AstIntLiteralExpression(filenum_position, 1);
+    }
+    args->append(filenum);
+
+    const SourcePosition reclen_position(currentToken.position);
+    AstExpression *reclen = NULL;
+    if (want(TOKEN_LEN)) {
+        need(TOKEN_ASSIGN, "Expected '='");
+        reclen = parseExpression();
+    }
+    if (!reclen) {
+        reclen = new AstIntLiteralExpression(reclen_position, -1);
+    }
+    args->append(reclen);
+    return new AstSubCallStatement(position, "OPEN", args);
+} // Parser::parseOpen
+
+AstSubCallStatement *Parser::parseClose()
+{
+    std::vector<AstExpression*> fileids;
+    const SourcePosition position(previousToken.position);
+
+    do {
+        want(TOKEN_HASH);  // optional '#' before file id.
+        AstExpression *expr = parseExpression();
+        if (!expr) {
+            fail("Expected file number expression");
+        } else {
+            fileids.push_back(expr);
+        }
+    } while (want(TOKEN_COMMA));
+
+    AstIntLiteralExpression *numids = new AstIntLiteralExpression(position, fileids.size());
+    AstExpressionList *args = new AstExpressionList(position, numids);
+    for (std::vector<AstExpression*>::iterator it = fileids.begin(); it != fileids.end(); ++it) {
+        args->append(*it);
+    }
+    return new AstSubCallStatement(position, "CLOSE", args);
+} // Parser::parseClose
 
 AstStatement *Parser::parseEnd() {
     const SourcePosition position(previousToken.position);

@@ -110,6 +110,7 @@ scanner_loop:
     "="             { RET(TOKEN_ASSIGN); }
     ";"             { RET(TOKEN_SEMICOLON); }
     "?"             { RET(TOKEN_QUESTION); }
+    "#"             { RET(TOKEN_HASH); }
 
     "\000"          { if (eoi) { RET(TOKEN_EOI); } goto bad_chars; }
 

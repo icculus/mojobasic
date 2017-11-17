@@ -406,6 +406,7 @@ enum Token
     TOKEN_ASSIGN,
     TOKEN_SEMICOLON,
     TOKEN_QUESTION,
+    TOKEN_HASH,
     TOKEN_NEWLINE,
     TOKEN_WHITESPACE,
     TOKEN_UNKNOWN,
@@ -496,7 +497,17 @@ enum Token
     TOKEN_IS,
     TOKEN_RESUME,
     TOKEN_NEXT,
-    TOKEN_GOTO
+    TOKEN_GOTO,
+    TOKEN_RANDOM,  // RANDOM through APPEND _must_ be next to each other in this order! (we convert to int and subtract TOKEN_RANDOM to get OPEN() value).
+    TOKEN_BINARY,
+    TOKEN_INPUT,
+    TOKEN_OUTPUT,
+    TOKEN_APPEND,
+    TOKEN_READ,
+    TOKEN_WRITE,
+    TOKEN_LOCK,
+    TOKEN_ACCESS,
+    TOKEN_LEN
 };
 
 
