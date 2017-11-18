@@ -285,6 +285,7 @@ void Parser::convertToParserToken(TokenData &data)
         TOKENCMP(GET);
         TOKENCMP(PUT);
         TOKENCMP(STEP);
+        TOKENCMP(USING);
         #undef TOKENCMP
     } // if
 } // Parser::convertToParserToken
@@ -1181,10 +1182,56 @@ AstSubCallStatement *Parser::parseSeek()
 AstSubCallStatement *Parser::parsePrint()
 {
     const SourcePosition position(previousToken.position);
+    AstExpressionList *args = NULL;
+    bool bHasUsing = false;
+    bool bDone = false;
 
-    // !!! FIXME: actually write me. This one is nasty.
-    dumpUntilEndOfStatement(); pushback();
-    return new AstSubCallStatement(position, "PRINT", NULL);
+    while (!bDone) {
+        AstExpression *expr = NULL;
+        int type = -1;
+        if (wantEndOfStatement()) {
+            type = 0;
+            pushback();
+            bDone = true;
+        } else if (want(TOKEN_USING)) {
+            if (bHasUsing) {
+                fail("Can't have multiple USING clauses");
+            }
+            bHasUsing = true;
+            type = 1;
+            expr = parseExpression();
+            need(TOKEN_SEMICOLON, "Expected ';'");
+        } else if (want(TOKEN_SEMICOLON)) {
+            type = 2;
+        } else if (want(TOKEN_COMMA)) {
+            type = 3;
+        } else {
+            expr = parseExpression();
+            if (expr) {
+                type = 4;
+            }
+        }
+
+        // !!! FIXME: ugh, get rid of this need to have the first expression when constructing AstExpressionList.
+        if (type != -1) {
+            AstIntLiteralExpression *expr = new AstIntLiteralExpression(position, type);
+            if (!args) {
+                args = new AstExpressionList(position, expr);
+            } else {
+                args->append(expr);
+            }
+        }
+
+        if (expr) {
+            if (!args) {
+                args = new AstExpressionList(position, expr);
+            } else {
+                args->append(expr);
+            }
+        }
+    }
+
+    return new AstSubCallStatement(position, "PRINT", args);
 } // Parser::parsePrint()
 
 AstSubCallStatement *Parser::parseView()

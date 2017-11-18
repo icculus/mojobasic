@@ -510,7 +510,8 @@ enum Token
     TOKEN_DEF,
     TOKEN_GET,
     TOKEN_PUT,
-    TOKEN_STEP
+    TOKEN_STEP,
+    TOKEN_USING
 };
 
 
