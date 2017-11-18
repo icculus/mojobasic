@@ -105,6 +105,7 @@ private:
     AstSubCallStatement *parseInput();
     AstSubCallStatement *parseLine();
     AstSubCallStatement *parseGetOrPut(const bool bIsGet);
+    AstSubCallStatement *parseSeek();
     AstIfStatement *parseIf();
     AstForStatement *parseFor();
     AstStatement *parseDo();
@@ -442,6 +443,10 @@ AstStatement *Parser::parseStatement() {
     else if (want(TOKEN_VIEW)) return parseView();
     else if (want(TOKEN_LINE)) return parseLine();
     else if (want(TOKEN_INPUT)) return parseInput();
+
+    // SEEK can be a function or sub, so we have to check for it separately.
+    else if (wantIdentifier("SEEK")) return parseSeek();  // !!! FIXME: it's messy to make this an actual keyword, but incorrect to not do so.
+
     else if (want(TOKEN_IDENTIFIER)) return parseIdentifierStatement();
 
     // numeric labels have to be at the start of the line, a ':' separator won't do.
@@ -1148,6 +1153,15 @@ AstSubCallStatement *Parser::parseGetOrPut(const bool bIsGet)
     if (lvalue) args->append(lvalue);
     return new AstSubCallStatement(position, bIsGet ? "GET" : "PUT", args);
 } // Parser::parseGetOrPut
+
+
+// this is only the sub version. Function version just works like anything else.
+AstSubCallStatement *Parser::parseSeek()
+{
+    const SourcePosition position(previousToken.position);
+    want(TOKEN_HASH);  // optional.
+    return new AstSubCallStatement(position, "SEEK", parseFunctionArgs());
+} // Parser::parseSeek
 
 AstSubCallStatement *Parser::parsePrint()
 {
