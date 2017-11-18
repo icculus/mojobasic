@@ -135,6 +135,16 @@ AstProgram *parseSource(void *ctx, StringCache &strcache, const char *filename, 
 } // parseSource
 
 
+static int64 strtoi64_hex(const char *_str, unsigned int len)
+{
+    // !!! FIXME: laziness
+    char str[64];
+    assert(len < 64);
+    memcpy(str, _str, len);
+    str[len] = 0;
+    return (int64) strtoll(str, NULL, 16);
+} // strtoi64_hex
+
 static int64 strtoi64(const char *str, unsigned int len)
 {
     int64 retval = 0;
@@ -185,10 +195,15 @@ void Parser::convertToParserToken(TokenData &data)
 {
     data.i64 = 0;
 
-    if (data.tokenval == TOKEN_INT_LITERAL)
-        data.i64 = strtoi64(data.token, data.tokenlen);
+    if (data.tokenval == TOKEN_INT_LITERAL) {
+        // convert from hexadecimal.
+        if ((data.tokenlen >= 2) && (data.token[0] == '&') && ((data.token[1] == 'H') || (data.token[1] == 'h'))) {
+            data.i64 = strtoi64_hex(data.token+2, data.tokenlen-2);
+        } else {
+            data.i64 = strtoi64(data.token, data.tokenlen);
+        }
 
-    else if (data.tokenval == TOKEN_FLOAT_LITERAL)
+    } else if (data.tokenval == TOKEN_FLOAT_LITERAL)
         data.dbl = strtodouble(data.token, data.tokenlen);
 
     else if (data.tokenval == TOKEN_STRING_LITERAL)
