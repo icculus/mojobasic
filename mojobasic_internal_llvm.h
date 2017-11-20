@@ -59,6 +59,7 @@ struct AstNotExpression;
 struct AstMultiplyExpression;
 struct AstDivideExpression;
 struct AstIntegerDivideExpression;
+struct AstExponentExpression;
 struct AstModuloExpression;
 struct AstAddExpression;
 struct AstSubtractExpression;
@@ -112,6 +113,7 @@ public:
     virtual void visit(AstMultiplyExpression *node) = 0;
     virtual void visit(AstDivideExpression *node) = 0;
     virtual void visit(AstIntegerDivideExpression *node) = 0;
+    virtual void visit(AstExponentExpression *node) = 0;
     virtual void visit(AstModuloExpression *node) = 0;
     virtual void visit(AstAddExpression *node) = 0;
     virtual void visit(AstSubtractExpression *node) = 0;
@@ -301,6 +303,7 @@ struct AstBinaryExpression : public AstExpression
 AST_BINARY_EXPR_STRUCT(Multiply, MULTIPLY);
 AST_BINARY_EXPR_STRUCT(Divide, DIVIDE);
 AST_BINARY_EXPR_STRUCT(IntegerDivide, DIVIDE);
+AST_BINARY_EXPR_STRUCT(Exponent, EXPONENT);
 AST_BINARY_EXPR_STRUCT(Modulo, MODULO);
 AST_BINARY_EXPR_STRUCT(Add, ADD);
 AST_BINARY_EXPR_STRUCT(Subtract, SUBTRACT);

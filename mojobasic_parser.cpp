@@ -1384,6 +1384,7 @@ static AstExpression *newAstExpressionByOperator(const SourcePosition &position,
         case TOKEN_XOR: return new AstBinaryXorExpression(position, l, r);
         case TOKEN_EQV: return new AstBinaryEqvExpression(position, l, r);
         case TOKEN_IMP: return new AstBinaryImpExpression(position, l, r);
+        case TOKEN_EXPONENT: return new AstExponentExpression(position, l, r);
         default: break;
     } // switch
 

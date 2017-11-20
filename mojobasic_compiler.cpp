@@ -227,6 +227,7 @@ public:
     virtual void visit(AstMultiplyExpression *node) { visitBinaryExpr(node, "*"); }
     virtual void visit(AstDivideExpression *node) { visitBinaryExpr(node, "/"); }
     virtual void visit(AstIntegerDivideExpression *node) { visitBinaryExpr(node, "\\"); }
+    virtual void visit(AstExponentExpression *node) { visitBinaryExpr(node, "^"); }
     virtual void visit(AstModuloExpression *node) { visitBinaryExpr(node, "MOD"); }
     virtual void visit(AstAddExpression *node) { visitBinaryExpr(node, "+"); }
     virtual void visit(AstSubtractExpression *node) { visitBinaryExpr(node, "-"); }
@@ -346,7 +347,9 @@ public:
 
     virtual void visit(AstIfStatement *node) {
         printf("IF "); node->expr->accept(this); printf(" THEN\n");
-        node->block->accept(this);
+        if (node->block) {
+            node->block->accept(this);
+        }
         if (node->else_block) {
             printIndent();
             printf("ELSE\n");
@@ -538,6 +541,8 @@ public:
 
     virtual void visit(AstMultiplyExpression *node) { visitBinaryMathExpression(node); }
     virtual void visit(AstDivideExpression *node) { visitBinaryMathExpression(node); }
+    virtual void visit(AstIntegerDivideExpression *node) { visitBinaryMathExpression(node); }
+    virtual void visit(AstExponentExpression *node) { visitBinaryMathExpression(node); }
     virtual void visit(AstModuloExpression *node) { visitBinaryMathExpression(node); }
     virtual void visit(AstAddExpression *node) { visitBinaryMathExpression(node); }
     virtual void visit(AstSubtractExpression *node) { visitBinaryMathExpression(node); }
