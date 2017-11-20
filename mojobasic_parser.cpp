@@ -299,8 +299,11 @@ AstProgram *Parser::run(const char *filename, const char *source, unsigned int s
     const SourcePosition startpos(currentToken.position);
 
     StatementCollector collector(startpos);
-    while (!want(TOKEN_EOI))
-        parseStatements(collector);
+    while (!want(TOKEN_EOI)) {
+        if (!parseStatements(collector)) {
+            failAndDumpStatement("Syntax error");
+        }
+    }
 
     preprocessor_end(pp);
     pp = NULL;
@@ -365,7 +368,7 @@ bool Parser::need(const Token t, const char *err) {
         getNextToken();
         return true;
     } // if
-    failAndDumpStatement(err);
+    fail(err);
     return false;
 } // Parser::need
 
