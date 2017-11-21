@@ -301,8 +301,11 @@ AstProgram *Parser::run(const char *filename, const char *source, unsigned int s
     const SourcePosition startpos(currentToken.position);
 
     StatementCollector collector(startpos);
-    while (!want(TOKEN_EOI)) {
+    while (true) {
         if (!parseStatements(collector)) {
+            if (want(TOKEN_EOI)) {
+                break;
+            }
             failAndDumpStatement("Syntax error");
         }
     }
