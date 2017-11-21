@@ -511,7 +511,8 @@ enum Token
     TOKEN_GET,
     TOKEN_PUT,
     TOKEN_STEP,
-    TOKEN_USING
+    TOKEN_USING,
+    TOKEN_WEND
 };
 
 

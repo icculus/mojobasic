@@ -109,6 +109,7 @@ private:
     AstIfStatement *parseIf();
     AstForStatement *parseFor();
     AstStatement *parseDo();
+    AstStatement *parseWhile();
     AstStatement *parseEnd();
     AstExitStatement *parseExit();
     AstSelectStatement *parseSelect();
@@ -286,6 +287,7 @@ void Parser::convertToParserToken(TokenData &data)
         TOKENCMP(PUT);
         TOKENCMP(STEP);
         TOKENCMP(USING);
+        TOKENCMP(WEND);
         #undef TOKENCMP
     } // if
 } // Parser::convertToParserToken
@@ -446,7 +448,7 @@ AstStatement *Parser::parseStatement() {
     else if (want(TOKEN_IF)) return parseIf();
     else if (want(TOKEN_FOR)) return parseFor();
     else if (want(TOKEN_DO)) return parseDo();
-    //else if (want(TOKEN_WHILE)) return parseWhile();
+    else if (want(TOKEN_WHILE)) return parseWhile();
     else if (want(TOKEN_SELECT)) return parseSelect();
     else if (want(TOKEN_EXIT)) return parseExit();
     else if (want(TOKEN_END)) return parseEnd();
@@ -897,6 +899,29 @@ AstStatement *Parser::parseDo() {
 
     return new AstDoStatement(position, bIsConditionalAtStart, bIsWhile, collector.newStatementBlock(), cond);
 } // Parser::parseDo
+
+AstStatement *Parser::parseWhile() {
+    const SourcePosition position(previousToken.position);
+    AstExpression *cond = parseExpression();
+
+    needEndOfStatement();
+
+    StatementCollector collector(currentToken.position);
+    while (true) {
+        if (!parseStatements(collector)) {
+            if (want(TOKEN_WEND)) {
+                break;
+            } else if (want(TOKEN_EOI)) {
+                fail("Expected WEND");
+                break;
+            } else {
+                failAndDumpStatement("Syntax error");
+            }
+        }
+    }
+
+    return new AstWhileStatement(position, cond, collector.newStatementBlock());
+} // Parser::parseWhile
 
 AstSelectStatement *Parser::parseSelect()
 {
