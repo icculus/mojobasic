@@ -470,8 +470,8 @@ AstStatement *Parser::parseStatement() {
     else if (want(TOKEN_EXIT)) return parseExit();
     else if (want(TOKEN_END)) return parseEnd();
 
-        // these are just function calls into the standard runtime, but they
-        //  have magic syntactic sugar in BASIC...
+    // these are just function calls into the standard runtime, but they
+    //  have magic syntactic sugar in BASIC...
     else if (want(TOKEN_PRINT) || want(TOKEN_QUESTION)) return parsePrint();
     else if (want(TOKEN_OPEN)) return parseOpen();
     else if (want(TOKEN_CLOSE)) return parseClose();
@@ -1568,10 +1568,6 @@ AstExpression *Parser::parseSubExpression() {
 
     return NULL;
 } // Parser::parseSubExpression
-
-
-//assignment_statement
-//label
 
 // end of mojobasic_parser.cpp ...
 
