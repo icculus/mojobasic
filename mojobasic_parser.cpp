@@ -589,6 +589,7 @@ AstStatement *Parser::parseIdentifierStatement()
         }
     }
 
+    delete lvalue;
     return NULL;  // i give up
 } // Parser::parseIdentifierStatement
 
