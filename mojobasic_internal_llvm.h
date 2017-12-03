@@ -510,10 +510,12 @@ struct AstOnErrorStatement : public AstStatement
 
 struct AstProgram : public AstNode
 {
-    AstProgram(const SourcePosition &pos, AstStatementBlock *_block) : AstNode(pos), block(_block) {}
+    AstProgram(const SourcePosition &pos, AstStatementBlock *_block, const bool _bOptionExplicit, const int _optionBase) : AstNode(pos), block(_block), bOptionExplicit(_bOptionExplicit), optionBase(_optionBase) {}
     virtual ~AstProgram() { delete block; }
     virtual void accept(AstVisitor *visitor) { visitor->visit(this); }
     AstStatementBlock *block;
+    const bool bOptionExplicit;
+    const int optionBase;
 };
 
 void failCompile(void *c, const char *err, const SourcePosition &pos);

@@ -183,7 +183,15 @@ class AstPrinterVisitor : public AstVisitor
 public:
     AstPrinterVisitor() : indent(-1) { printf("PARSER: visiting AST for pretty-printing...\n"); }
     ~AstPrinterVisitor() { printf("PARSER: ...pretty-printing visit complete.\n"); }
-    virtual void visit(AstProgram *node) { node->block->accept(this); }
+    virtual void visit(AstProgram *node) {
+        if (node->bOptionExplicit) {
+            printf("OPTION EXPLICIT\n");
+        }
+        if (node->optionBase == 0) {
+            printf("OPTION BASE 0\n");
+        }
+        node->block->accept(this);
+    }
 
     virtual void visit(AstProcedureDeclaration *node) {
         printf("DECLARE ");

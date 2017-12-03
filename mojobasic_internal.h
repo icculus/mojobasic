@@ -512,7 +512,10 @@ enum Token
     TOKEN_PUT,
     TOKEN_STEP,
     TOKEN_USING,
-    TOKEN_WEND
+    TOKEN_WEND,
+    TOKEN_OPTION,
+    TOKEN_EXPLICIT,
+    TOKEN_BASE
 };
 
 

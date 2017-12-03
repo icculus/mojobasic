@@ -57,6 +57,8 @@ public:
         , strcache(_strcache)
         , bPushedBack(false)
         , bWasNumericLabel(false)
+        , optionExplicit(-1)
+        , optionBase(-1)
     {}
 
     ~Parser() { assert(pp == NULL); }
@@ -98,6 +100,7 @@ private:
     AstDefStatement *parseDefStr() { return parseDefType("STR"); }
     AstStatement *parseOnError(const bool bLocal);
     AstStatement *parseOn();
+    void parseOption();
     AstSubCallStatement *parseOpen();
     AstSubCallStatement *parseClose();
     AstSubCallStatement *parsePrint();
@@ -127,6 +130,8 @@ private:
     TokenData pushbackToken;
     bool bPushedBack;
     bool bWasNumericLabel;
+    int optionExplicit;
+    int optionBase;
 };
 
 AstProgram *parseSource(void *ctx, StringCache &strcache, const char *filename, const char *source, unsigned int sourcelen, MOJOBASIC_includeOpen include_open, MOJOBASIC_includeClose include_close)
@@ -288,6 +293,9 @@ void Parser::convertToParserToken(TokenData &data)
         TOKENCMP(STEP);
         TOKENCMP(USING);
         TOKENCMP(WEND);
+        TOKENCMP(OPTION);
+        TOKENCMP(EXPLICIT);
+        TOKENCMP(BASE);
         #undef TOKENCMP
     } // if
 } // Parser::convertToParserToken
@@ -313,7 +321,10 @@ AstProgram *Parser::run(const char *filename, const char *source, unsigned int s
     preprocessor_end(pp);
     pp = NULL;
 
-    return new AstProgram(startpos, collector.newStatementBlock());
+    if (optionExplicit == -1) optionExplicit = 0;
+    if (optionBase == -1) optionBase = 1;
+
+    return new AstProgram(startpos, collector.newStatementBlock(), optionExplicit != 0, optionBase);
 } // Parser::run
 
 void Parser::pushback()
@@ -432,6 +443,9 @@ bool Parser::needEndOfLine() {
 AstStatement *Parser::parseStatement() {
 
     while (want(TOKEN_NEWLINE)) { /* spin */ } // skip blank lines.
+
+    // OPTION doesn't return a statement, so just eat these without returning.
+    while (want(TOKEN_OPTION)) { parseOption(); needEndOfStatement(); }
 
     if (want(TOKEN_EOI)) return NULL;   // we're done.
     else if (want(TOKEN_METACOMMAND)) return parseMetacommand();
@@ -803,6 +817,33 @@ AstStatement *Parser::parseOn() {
     // (etc) if (want(TOKEN_PEN)) return parseOnPen();
     return failAndDumpStatement("Syntax error");  // !!! FIXME: "expected ERROR,etc"?
 } // Parser::parseOn
+
+void Parser::parseOption() {
+    const char *dupeerr = "Duplicate OPTION statement";
+
+    if (want(TOKEN_EXPLICIT)) {
+        if (optionExplicit != -1) {
+            fail(dupeerr);
+        } else {
+            optionExplicit = 1;
+        }
+    } else if (want(TOKEN_BASE)) {
+        const char *oneOrZeroErr = "Expected 0 or 1";
+        if (need(TOKEN_INT_LITERAL, oneOrZeroErr)) {
+            if ((previousToken.i64 != 0) && (previousToken.i64 != 1)) {
+                fail(oneOrZeroErr);
+            } else {
+                if (optionBase != -1) {
+                    fail(dupeerr);
+                } else {
+                    optionBase = (int) previousToken.i64;
+                }
+            }
+        }
+    } else {
+        fail("Expected BASE or EXPLICIT");
+    }
+} // Parser::parseOption
 
 AstForStatement *Parser::parseFor()
 {
